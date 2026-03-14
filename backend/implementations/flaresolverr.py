@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import Semaphore
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Tuple, Union
 
 from requests import RequestException
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 
 class FlareSolverr:
+    session_semaphore = Semaphore(Constants.MAX_CONCURRENT_FS_SESSIONS)
     cookie_mapping: Dict[str, Dict[str, str]] = {}
     ua_mapping: Dict[str, str] = {}
 
@@ -229,32 +231,33 @@ class FlareSolverr:
             return
 
         # Start session
-        session_id = (await self.__async_api_request(
-            self.base_url, session,
-            {
-                'cmd': 'sessions.create',
-                **(self.proxy_data or {})
-            }
-        ))["session"]
+        async with self.session_semaphore:
+            session_id = (await self.__async_api_request(
+                self.base_url, session,
+                {
+                    'cmd': 'sessions.create',
+                    **(self.proxy_data or {})
+                }
+            ))["session"]
 
-        # Get result
-        result = (await self.__async_api_request(
-            self.base_url, session,
-            {
-                'cmd': 'request.get',
-                'session': session_id,
-                'url': url
-            }
-        ))["solution"]
+            # Get result
+            result = (await self.__async_api_request(
+                self.base_url, session,
+                {
+                    'cmd': 'request.get',
+                    'session': session_id,
+                    'url': url
+                }
+            ))["solution"]
 
-        # Close session
-        await self.__async_api_request(
-            self.base_url, session,
-            {
-                'cmd': 'sessions.destroy',
-                'session': session_id
-            }
-        )
+            # Close session
+            await self.__async_api_request(
+                self.base_url, session,
+                {
+                    'cmd': 'sessions.destroy',
+                    'session': session_id
+                }
+            )
 
         self.ua_mapping[url] = result["userAgent"]
         self.cookie_mapping[url] = {
