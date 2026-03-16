@@ -275,11 +275,6 @@ library_els.view_options.sort.value = lib_options.lib_sorting;
 library_els.view_options.view.value = lib_options.lib_view;
 library_els.view_options.filter.value = lib_options.lib_filter;
 
-socket.on(
-	'mass_editor_status',
-	data => library_els.mass_edit.progress.innerText = `${data.current_item}/${data.total_items}`
-);
-
 usingApiKey()
 .then(api_key => {
 	fetchLibrary(api_key);
@@ -372,6 +367,11 @@ usingApiKey()
 							- data.not_downloaded_issues.length;
 			inst.setProgressBar(new_progress[0], new_progress[1])
 		}
+	);
+	// Socket is init after API key so wait for that like this
+	socket.on(
+		'mass_editor_status',
+		data => library_els.mass_edit.progress.innerText = `${data.current_item}/${data.total_items}`
 	);
 });
 library_els.search.container.action = 'javascript:searchLibrary();';
