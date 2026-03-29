@@ -587,6 +587,8 @@ def normalise_year(s: str) -> Union[int, None]:
 
     s = (s
         .strip()
+        .lower()
+        .replace('circa ', '')
         .replace('-', '0')
         .replace(',', '/')
         .replace('?', '')
