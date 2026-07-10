@@ -1184,3 +1184,18 @@ def _migrate_add_forced_file_match_column():
     """)
 
     return
+
+
+@DatabaseMigrationHandler.register_handler(45)
+def _migrate_add_comicvine_search_cache():
+    get_db().executescript("""
+        CREATE TABLE IF NOT EXISTS comicvine_search_cache(
+            query TEXT PRIMARY KEY,
+            fetched_at INTEGER NOT NULL,
+            results TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS comicvine_search_cache_fetched_at_index
+            ON comicvine_search_cache(fetched_at);
+    """)
+    return

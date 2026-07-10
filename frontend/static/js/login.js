@@ -72,7 +72,7 @@ usingApiKey(false)
 		loadFields();
 })
 
-if (JSON.parse(localStorage.getItem('kapowarr') || {'theme': 'light'})['theme'] === 'dark')
+if (JSON.parse(localStorage.getItem('kapowarr') || '{"theme":"dark"}')['theme'] === 'dark')
 	document.querySelector(':root').classList.add('dark-mode');
 
 document.querySelector('#login-form').action = 'javascript:login();';

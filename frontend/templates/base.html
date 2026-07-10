@@ -10,17 +10,18 @@
 	<link rel="manifest" href="{{url_base}}/manifest.json">
 	<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favicon.svg') }}">
 	<meta name="apple-mobile-web-app-status-bar" content="#ebc700">
-	<meta name="theme-color" content="#ebc700">
+	<meta name="theme-color" content="#0b0d12">
 
 	<link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/x-icon">
 
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 	<link rel="stylesheet" href="{{ url_for('static', filename='css/general.css') }}">
 	{% block css %}
 	{% endblock css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
 	<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO" crossorigin="anonymous"></script>
 	<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 	<script src="{{ url_for('static', filename='js/general.js') }}" defer></script>
@@ -55,6 +56,7 @@
 			</button>
 			<a href="{{url_base}}/" aria-label="Go to homepage">
 				<img src="{{ url_for('static', filename='img/favicon.svg') }}" alt="">
+				<span class="brand-name">Kapowarr <small>Reborn</small></span>
 			</a>
 		</div>
 		{% block right_side_header %}

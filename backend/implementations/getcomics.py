@@ -51,6 +51,12 @@ mediafire_dd_regex = compile(
     IGNORECASE
 )
 
+GETCOMICS_BUTTON_CLASSES = (
+    'aio-button-center',
+    'aio-pulse'
+)
+"""Known GetComics download-button wrapper classes."""
+
 
 # region Scraping
 def _get_max_page(
@@ -236,7 +242,10 @@ def __extract_button_links(
 
             elif (
                 e.name == 'div'
-                and 'aio-button-center' in (e.attrs.get('class', []))
+                and any(
+                    class_name in e.attrs.get('class', [])
+                    for class_name in GETCOMICS_BUTTON_CLASSES
+                )
             ):
                 group_link: Union[Tag, None] = e.find('a') # type: ignore
                 if not group_link:

@@ -515,6 +515,21 @@ class WeTransferDownload(BaseDirectDownload):
 
 
 # region PixelDrain
+def _get_pixeldrain_paid_transfer_state(
+    response: Dict[str, Any]
+) -> Tuple[int, Union[int, float]]:
+    """Read paid transfer usage from current and legacy API responses."""
+    subscription = response.get("subscription") or {}
+    transfer_limit = subscription.get("monthly_transfer_cap")
+    if transfer_limit is None:
+        transfer_limit = response.get("monthly_transfer_cap", -1)
+
+    if transfer_limit == -1:
+        transfer_limit = float("inf")
+
+    return response.get("monthly_transfer_used", 0), transfer_limit
+
+
 class PixelDrainDownload(BaseDirectDownload):
     "For downloading a file from PixelDrain"
 
@@ -557,10 +572,10 @@ class PixelDrainDownload(BaseDirectDownload):
 
             else:
                 # Paid account, so grab transfer limits from user data
-                transfer_limit_used = response["monthly_transfer_used"]
-                transfer_limit = response["monthly_transfer_cap"]
-                if transfer_limit == -1:
-                    transfer_limit = float("inf")
+                (
+                    transfer_limit_used,
+                    transfer_limit
+                ) = _get_pixeldrain_paid_transfer_state(response)
 
         LOGGER.debug(
             f"Pixeldrain account transfer state: {transfer_limit_used}/{transfer_limit}"

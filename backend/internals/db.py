@@ -350,6 +350,13 @@ CREATE TABLE IF NOT EXISTS config(
     key VARCHAR(100) PRIMARY KEY,
     value BLOB
 );
+CREATE TABLE IF NOT EXISTS comicvine_search_cache(
+    query TEXT PRIMARY KEY,
+    fetched_at INTEGER NOT NULL,
+    results TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS comicvine_search_cache_fetched_at_index
+    ON comicvine_search_cache(fetched_at);
 CREATE TABLE IF NOT EXISTS root_folders(
     id INTEGER PRIMARY KEY,
     folder VARCHAR(254) UNIQUE NOT NULL

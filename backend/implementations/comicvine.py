@@ -5,8 +5,9 @@ Search for volumes/issues and fetch metadata for them on ComicVine
 """
 
 from asyncio import gather, run, sleep
-from json import JSONDecodeError
+from json import JSONDecodeError, dumps, loads
 from re import IGNORECASE, compile
+from time import time
 from typing import Any, AsyncGenerator, Dict, Iterable, List, Sequence, Union
 
 from aiohttp import ContentTypeError
@@ -132,6 +133,12 @@ def _clean_description(description: str, short: bool = False) -> str:
 
 
 class ComicVine:
+    search_cache_ttl = 6 * 60 * 60
+    """Reuse successful ComicVine searches for six hours."""
+
+    search_cache_stale_ttl = 7 * 24 * 60 * 60
+    """Use older cached searches for up to seven days during rate limits."""
+
     volume_field_list = ','.join((
         'aliases',
         'count_of_issues',
@@ -654,10 +661,75 @@ class ComicVine:
                     'resources': 'volume',
                     'limit': 50,
                     'field_list': self.search_field_list
-                },
-                {'results': []}
+                }
             )
             return results['results']
+
+    @staticmethod
+    def __search_cache_key(query: str) -> str:
+        """Normalize equivalent user searches to the same cache entry."""
+        return ' '.join(query.split()).casefold()
+
+    def __get_cached_search(
+        self,
+        query: str,
+        max_age: int
+    ) -> Union[List[Dict[str, Any]], None]:
+        cached = get_db().execute("""
+            SELECT results
+            FROM comicvine_search_cache
+            WHERE query = ? AND fetched_at >= ?
+            LIMIT 1;
+            """,
+            (self.__search_cache_key(query), round(time()) - max_age)
+        ).fetchone()
+        if cached is None:
+            return None
+
+        try:
+            results = loads(cached['results'])
+            if not isinstance(results, list):
+                raise ValueError
+            return results
+
+        except (JSONDecodeError, TypeError, ValueError):
+            get_db().execute(
+                "DELETE FROM comicvine_search_cache WHERE query = ?;",
+                (self.__search_cache_key(query),)
+            )
+            return None
+
+    def __store_cached_search(
+        self,
+        query: str,
+        results: List[Dict[str, Any]]
+    ) -> None:
+        cursor = get_db()
+        cursor.execute("""
+            INSERT INTO comicvine_search_cache(query, fetched_at, results)
+            VALUES (?, ?, ?)
+            ON CONFLICT(query) DO UPDATE SET
+                fetched_at = excluded.fetched_at,
+                results = excluded.results;
+            """,
+            (
+                self.__search_cache_key(query),
+                round(time()),
+                dumps(results, separators=(',', ':'))
+            )
+        )
+        cursor.execute("""
+            DELETE FROM comicvine_search_cache
+            WHERE fetched_at < ?
+               OR query NOT IN (
+                    SELECT query
+                    FROM comicvine_search_cache
+                    ORDER BY fetched_at DESC
+                    LIMIT 200
+               );
+            """,
+            (round(time()) - self.search_cache_stale_ttl,)
+        )
 
     async def search_volumes(
         self,
@@ -681,6 +753,22 @@ class ComicVine:
         """
         LOGGER.debug(f'Searching for volumes with the query {query}')
 
+        query = ' '.join(query.split())
+        if not query:
+            return []
+
+        cached_results = self.__get_cached_search(
+            query,
+            self.search_cache_ttl
+        )
+        if cached_results is not None:
+            LOGGER.debug('Using cached ComicVine search for %s', query)
+            return (
+                self.__format_search_output(cached_results)
+                if cached_results
+                else []
+            )
+
         try:
             if query.startswith(('4050-', 'cv:')):
                 results = await self.__search_volume(query)
@@ -691,10 +779,27 @@ class ComicVine:
             return []
 
         except CVRateLimitReached:
+            cached_results = self.__get_cached_search(
+                query,
+                self.search_cache_stale_ttl
+            )
+            if cached_results is not None:
+                LOGGER.warning(
+                    'ComicVine rate limit reached; using stale search cache '
+                    'for %s',
+                    query
+                )
+                return (
+                    self.__format_search_output(cached_results)
+                    if cached_results
+                    else []
+                )
+
             if allow_rate_limit_reached:
                 return []
             raise
 
+        self.__store_cached_search(query, results)
         if not results:
             return []
 

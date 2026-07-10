@@ -37,6 +37,7 @@ const SearchEls = {
 		submit: document.querySelector('#add-volume')
 	}
 };
+let searchInProgress = false;
 
 //
 // Searching
@@ -207,6 +208,10 @@ function buildResults(results, api_key) {
 function search(reset_url_params=true) {
 	if (!SearchEls.msgs.blocked.classList.contains('hidden'))
 		return;
+	if (searchInProgress)
+		return;
+
+	searchInProgress = true;
 
 	SearchEls.search_bar.input.blur();
 
@@ -224,7 +229,7 @@ function search(reset_url_params=true) {
 
     usingApiKey().then(api_key => {
 		const query = SearchEls.search_bar.input.value;
-		fetchAPI('/volumes/search', api_key, {query: query})
+		return fetchAPI('/volumes/search', api_key, {query: query})
 		.then(json => {
 
 			buildResults(json.result, api_key);
@@ -234,12 +239,15 @@ function search(reset_url_params=true) {
 			else
 				hide([SearchEls.msgs.loading], [SearchEls.search_results]);
 		})
-		.catch(e => {
-			if (e.status === 400)
-				hide([SearchEls.msgs.loading], [SearchEls.msgs.failed]);
-			else
-				console.log(e);
-		});
+	})
+	.catch(e => {
+		if (e.status === 400 || e.status === 509)
+			hide([SearchEls.msgs.loading], [SearchEls.msgs.failed]);
+		else
+			console.log(e);
+	})
+	.finally(() => {
+		searchInProgress = false;
 	});
 };
 
