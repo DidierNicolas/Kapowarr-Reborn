@@ -14,6 +14,8 @@ function fillSettings(api_key) {
 		document.querySelector('#proxy-password-input').value = json.result.proxy_password;
 		document.querySelector('#proxy-ignored-addresses-input').value = json.result.proxy_ignored_addresses.join(',');
 		document.querySelector('#cv-input').value = json.result.comicvine_api_key;
+		document.querySelector('#metron-username-input').value = json.result.metron_username;
+		document.querySelector('#metron-password-input').value = json.result.metron_password;
 		document.querySelector('#flaresolverr-input').value = json.result.flaresolverr_base_url;
 		document.querySelector('#log-level-input').value = json.result.log_level;
 		
@@ -51,6 +53,8 @@ function saveSettings(api_key) {
 		'proxy_password': document.querySelector('#proxy-password-input').value,
 		'proxy_ignored_addresses': proxyIgnoredAddresses,
 		'comicvine_api_key': document.querySelector('#cv-input').value,
+		'metron_username': document.querySelector('#metron-username-input').value,
+		'metron_password': document.querySelector('#metron-password-input').value,
 		'flaresolverr_base_url': document.querySelector('#flaresolverr-input').value,
 		'log_level': parseInt(document.querySelector('#log-level-input').value)
 	};

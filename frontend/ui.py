@@ -71,6 +71,11 @@ def ui_calendar():
     return render('calendar.html')
 
 
+@ui.route('/this-week', methods=methods)
+def ui_this_week():
+    return render('this_week.html')
+
+
 @ui.route('/volumes/<id>', methods=methods)
 def ui_view_volume(id):
     return render('view_volume.html')

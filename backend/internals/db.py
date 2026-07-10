@@ -359,6 +359,12 @@ CREATE TABLE IF NOT EXISTS comicvine_search_cache(
 );
 CREATE INDEX IF NOT EXISTS comicvine_search_cache_fetched_at_index
     ON comicvine_search_cache(fetched_at);
+CREATE TABLE IF NOT EXISTS weekly_releases(
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    pack_id TEXT UNIQUE NOT NULL,
+    fetched_at INTEGER NOT NULL,
+    data TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS upcoming_releases(
     id INTEGER PRIMARY KEY,
     volume_id INTEGER NOT NULL,

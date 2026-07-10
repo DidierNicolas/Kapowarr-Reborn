@@ -22,6 +22,7 @@ from backend.features.search import auto_search
 from backend.implementations.conversion import mass_convert
 from backend.implementations.naming import mass_rename
 from backend.implementations.upcoming_releases import refresh_upcoming_releases
+from backend.implementations.weekly_releases import refresh_weekly_releases
 from backend.implementations.volumes import Volume, refresh_and_scan
 from backend.internals.db import close_db, get_db
 from backend.internals.server import (TaskAddedEvent, TaskEndedEvent,
@@ -515,6 +516,36 @@ class RefreshUpcomingReleases(Task):
         refresh_upcoming_releases()
         return
 
+
+class RefreshWeeklyReleases(Task):
+    """Check for and persist a new GetComics weekly pack."""
+
+    stop = False
+    message = ''
+    action = 'refresh_weekly_releases'
+    display_title = 'Refresh This Week Comics'
+    category = ''
+
+    @property
+    def volume_id(self) -> None:
+        return None
+
+    @property
+    def issue_id(self) -> None:
+        return None
+
+    def __init__(self) -> None:
+        return
+
+    def run(self) -> None:
+        self.message = 'Checking for a new weekly comics pack'
+        WebSocket().emit(TaskStatusEvent(self.message))
+        def progress(message: str) -> None:
+            self.message = message
+            WebSocket().emit(TaskStatusEvent(message))
+
+        refresh_weekly_releases(progress)
+        return
 
 # =====================
 # Task handling

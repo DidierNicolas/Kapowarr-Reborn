@@ -1220,3 +1220,16 @@ def _migrate_add_upcoming_releases():
             ON upcoming_releases(release_date);
     """)
     return
+
+
+@DatabaseMigrationHandler.register_handler(47)
+def _migrate_add_weekly_releases():
+    get_db().execute("""
+        CREATE TABLE IF NOT EXISTS weekly_releases(
+            id INTEGER PRIMARY KEY CHECK(id = 1),
+            pack_id TEXT UNIQUE NOT NULL,
+            fetched_at INTEGER NOT NULL,
+            data TEXT NOT NULL
+        );
+    """)
+    return

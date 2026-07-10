@@ -233,6 +233,11 @@ function search(reset_url_params=true) {
 		.then(json => {
 
 			buildResults(json.result, api_key);
+			const params = new URLSearchParams(window.location.search);
+			if (params.get('auto') === '1' && json.result.length === 1
+			&& json.result[0].already_added === null) {
+				showAddWindow(json.result[0].comicvine_id, api_key);
+			}
 
 			if (!SearchEls.search_results.querySelector('button:not(.filter-bar)'))
 				hide([SearchEls.msgs.loading], [SearchEls.msgs.empty]);

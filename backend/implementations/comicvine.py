@@ -317,7 +317,8 @@ class ComicVine:
 
     def __format_issue_output(
         self,
-        issue_data: Dict[str, Any]
+        issue_data: Dict[str, Any],
+        date_type: Union[str, None] = None
     ) -> IssueMetadata:
         """Format the API output containing the metadata of the issue.
 
@@ -339,7 +340,7 @@ class ComicVine:
             'issue_number': issue_data['issue_number'].replace('/', '-').strip(),
             'calculated_issue_number': calculated_issue_number,
             'title': normalise_string(issue_data['name'] or '') or None,
-            'date': issue_data[self.date_type] or None,
+            'date': issue_data[date_type or self.date_type] or None,
             'description': _clean_description(
                 issue_data['description'],
                 short=True
@@ -558,7 +559,8 @@ class ComicVine:
 
     async def fetch_issues(
         self,
-        cv_ids: Sequence[Union[str, int]]
+        cv_ids: Sequence[Union[str, int]],
+        date_type: Union[str, None] = None
     ) -> List[IssueMetadata]:
         """Get the metadata of the issues of volumes.
 
@@ -599,7 +601,7 @@ class ComicVine:
                     break
 
                 issue_infos.extend((
-                    self.__format_issue_output(r)
+                    self.__format_issue_output(r, date_type)
                     for r in results['results']
                 ))
 
@@ -626,7 +628,7 @@ class ComicVine:
 
                         for batch in responses:
                             issue_infos.extend((
-                                self.__format_issue_output(r)
+                                self.__format_issue_output(r, date_type)
                                 for r in batch['results']
                             ))
 
@@ -659,7 +661,7 @@ class ComicVine:
                 {
                     'query': query,
                     'resources': 'volume',
-                    'limit': 50,
+                    'limit': 100,
                     'field_list': self.search_field_list
                 }
             )
@@ -668,7 +670,9 @@ class ComicVine:
     @staticmethod
     def __search_cache_key(query: str) -> str:
         """Normalize equivalent user searches to the same cache entry."""
-        return ' '.join(query.split()).casefold()
+        # v2 invalidates entries created when searches only requested 50
+        # results. Broad names such as Wolverine need the deeper result set.
+        return 'v2:' + ' '.join(query.split()).casefold()
 
     def __get_cached_search(
         self,

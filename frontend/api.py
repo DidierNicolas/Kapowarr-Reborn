@@ -44,6 +44,8 @@ from backend.implementations.naming import (generate_volume_folder_name,
 from backend.implementations.remote_mapping import RemoteMappings
 from backend.implementations.root_folders import RootFolders
 from backend.implementations.volumes import Library, delete_issue_file
+from backend.implementations.weekly_releases import (get_weekly_releases,
+                                                     set_weekly_release_match)
 from backend.internals.db import get_db
 from backend.internals.db_models import FilesDB
 from backend.internals.server import Server, StartTypeHandlers
@@ -912,6 +914,21 @@ def api_calendar():
     ))
 
     return return_api(issues)
+
+
+@api.route('/weekly-releases', methods=['GET', 'PUT'])
+@error_handler
+@auth
+def api_weekly_releases():
+    if request.method == 'GET':
+        return return_api(get_weekly_releases())
+    data = request.get_json(silent=True) or {}
+    try:
+        comic_url = str(data['comic_url'])
+        comicvine_id = int(data['comicvine_id'])
+        return return_api(set_weekly_release_match(comic_url, comicvine_id))
+    except (KeyError, TypeError, ValueError):
+        raise InvalidKeyValue('comicvine_id', data.get('comicvine_id'))
 
 
 @api.route('/volumes/<int:id>', methods=['GET', 'PUT', 'DELETE'])

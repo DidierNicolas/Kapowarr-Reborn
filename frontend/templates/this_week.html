@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "base.html" import window, loading_window %}
+{% block title %}This Week Comics{% endblock %}
+{% block css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/this_week.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/window.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/add_volume.css') }}">
+{% endblock %}
+{% block js %}
+	<script src="{{ url_for('static', filename='js/window.js') }}" defer></script>
+	<script src="{{ url_for('static', filename='js/this_week.js') }}" defer></script>
+{% endblock %}
+
+{% block windows %}
+	{{ loading_window("loading-window", "Adding volume...") }}
+	{% set add_content %}
+		<img src="" id="add-cover" alt="">
+		<form id="add-form">
+			<input type="hidden" id="comicvine-input" value="">
+			<table class="fold-table">
+				<tr><th><label for="rootfolder-input">Root Folder</label></th><td><select id="rootfolder-input"></select></td></tr>
+				<tr><th><label for="volumefolder-input">Volume Folder</label></th><td><input type="text" id="volumefolder-input"></td></tr>
+				<tr><th><label for="monitor-volume-input">Monitor Volume</label></th><td><select id="monitor-volume-input"><option value="true" selected>Yes</option><option value="false">No</option></select></td></tr>
+				<tr><th><label for="monitor-issues-input">Monitor New Issues</label></th><td><select id="monitor-issues-input"><option value="true" selected>Yes</option><option value="false">No</option></select><p>When new issues come out, automatically monitor them.</p></td></tr>
+				<tr><th><label for="monitoring-scheme-input">Monitoring Scheme</label></th><td><select id="monitoring-scheme-input"><option value="all" selected>All</option><option value="missing">Missing</option><option value="none">None</option></select><p>Choose which released issues to monitor.</p></td></tr>
+				<tr><th><label for="specialoverride-input">Special Version</label></th><td><select id="specialoverride-input"><option value="auto" selected>Automatic</option><option value="">Normal Volume</option><option value="tpb">Trade Paper Back</option><option value="one-shot">One Shot</option><option value="hard-cover">Hard Cover</option><option value="omnibus">Omnibus</option><option value="volume-as-issue">Volume As Issue</option></select></td></tr>
+			</table>
+		</form>
+	{% endset %}
+	{% set add_submit %}
+		<label for="auto-search-input">Start search for missing volume</label>
+		<input type="checkbox" id="auto-search-input">
+		<button id="add-volume" type="submit" form="add-form">Add Volume</button>
+	{% endset %}
+	{{ window(False, "add-window", "Add volume", add_content, add_submit, "loading-window", False) }}
+{% endblock windows %}
+
+{% block main %}
+<main>
+	<section class="week-header">
+		<div><h1 id="week-title">This Week Comics</h1><p>ComicVine matches are selected automatically.</p></div>
+		<div class="week-legend"><span class="downloaded">Downloaded</span><span class="missing">Missing</span><span class="unmonitored">Not monitored</span></div>
+		<a id="week-source" href="" target="_blank" rel="noopener">View weekly pack</a>
+	</section>
+	<section id="week-loading"><span class="week-spinner"></span><div><strong>Loading this week's comics…</strong><small>The first load fetches ComicVine metadata and can take a few minutes.</small></div></section>
+	<section id="week-grid" class="week-grid hidden" aria-live="polite"></section>
+	<section id="match-dialog" class="match-dialog hidden" aria-label="ComicVine matches">
+		<div class="match-panel">
+			<div class="match-panel-header"><div><h2>Select the correct ComicVine series</h2><p>No candidate passed automatic issue and release-date validation.</p></div><button id="close-matches" type="button" aria-label="Close">×</button></div>
+			<div id="match-context" class="match-context"></div>
+			<div class="match-search"><span aria-hidden="true">⌕</span><input id="match-filter" type="search" placeholder="Filter candidates by title, year, or publisher" autocomplete="off"></div>
+			<div id="match-results"></div>
+			<div id="match-empty" class="match-empty hidden">No candidates match this filter.</div>
+			<div class="match-footer"><span>Still not listed?</span><button id="match-search-all" type="button">Search in Add Volume</button></div>
+		</div>
+	</section>
+</main>
+{% endblock %}

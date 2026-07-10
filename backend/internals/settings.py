@@ -73,6 +73,8 @@ class PublicSettingsValues:
     auth_password: str = ''
 
     comicvine_api_key: str = ''
+    metron_username: str = ''
+    metron_password: str = ''
     api_key: str = ''
     flaresolverr_base_url: str = ''
 
@@ -144,7 +146,8 @@ class PublicSettingsValues:
             return result
 
         for k, v in result.items():
-            if k in ("auth_username", "auth_password", "proxy_password") and v:
+            if k in ("auth_username", "auth_password", "proxy_password",
+                     "metron_password") and v:
                 result[k] = Constants.CREDENTIAL_REPLACEMENT
 
             if isinstance(v, BaseEnum):
@@ -169,7 +172,8 @@ task_intervals = {
     # but per se after each other, put them in that order in the dict.
     'update_all': 3600, # every hour
     'search_all': 86400, # every day
-    'refresh_upcoming_releases': 86400 # every day
+    'refresh_upcoming_releases': 86400, # every day
+    'refresh_weekly_releases': 86400 # every day
 }
 
 
@@ -459,6 +463,10 @@ class Settings(metaclass=Singleton):
         elif key == 'proxy_password':
             if value == Constants.CREDENTIAL_REPLACEMENT:
                 converted_value = self.sv.proxy_password
+
+        elif key == 'metron_password':
+            if value == Constants.CREDENTIAL_REPLACEMENT:
+                converted_value = self.sv.metron_password
 
         elif key == 'comicvine_api_key':
             from backend.implementations.comicvine import ComicVine
