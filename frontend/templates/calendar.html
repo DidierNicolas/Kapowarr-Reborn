@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+{% block css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+{% endblock %}
+{% block js %}
+	<script src="{{ url_for('static', filename='js/calendar.js') }}" defer></script>
+{% endblock %}
+
+{% block main %}
+<main>
+	<section class="calendar-toolbar" aria-label="Calendar navigation">
+		<div class="calendar-navigation">
+			<div class="month-arrows">
+				<button id="previous-month" type="button" aria-label="Previous month" title="Previous month">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+				</button>
+				<button id="next-month" type="button" aria-label="Next month" title="Next month">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+				</button>
+			</div>
+			<button id="today" type="button">Today</button>
+		</div>
+		<h1 id="calendar-title"></h1>
+		<div aria-hidden="true"></div>
+	</section>
+	<section id="calendar" class="calendar-grid" aria-live="polite"></section>
+	<section class="calendar-legend" aria-label="Calendar legend">
+		<span><i class="downloaded-monitored"></i>Downloaded (Monitored)</span>
+		<span><i class="missing-monitored"></i>Missing (Monitored)</span>
+		<span><i class="unreleased"></i>Unreleased</span>
+		<span><i class="downloaded-unmonitored"></i>Downloaded (Unmonitored)</span>
+		<span><i class="missing-unmonitored"></i>Missing (Unmonitored)</span>
+	</section>
+</main>
+{% endblock main %}

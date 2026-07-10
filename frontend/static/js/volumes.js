@@ -90,7 +90,8 @@ class LibraryEntry {
 	) {
 		downloaded_count = Math.min(downloaded_count, total_count);
 
-		const progress = downloaded_count / total_count * 100;
+		const progress = total_count === 0 ? 100 : downloaded_count / total_count * 100;
+		const missing_count = Math.max(total_count - downloaded_count, 0);
 		const list_bar = this.list_entry.querySelector('.list-prog-bar'),
 			table_bar = this.table_entry.querySelector('.table-prog-bar');
 
@@ -102,6 +103,14 @@ class LibraryEntry {
 		table_bar.style.width =
 			`${progress}%`;
 
+		const list_missing = this.list_entry.querySelector('.list-missing');
+		const table_missing = this.table_entry.querySelector('.table-missing');
+		list_missing.innerText = missing_count === 0 ? 'Complete' :
+			`${missing_count} issue${missing_count === 1 ? '' : 's'} missing`;
+		table_missing.innerText = missing_count;
+		list_missing.classList.toggle('complete', missing_count === 0);
+		table_missing.classList.toggle('complete', missing_count === 0);
+
 		if (progress === 100)
 			list_bar.style.backgroundColor =
 			table_bar.style.backgroundColor =
@@ -110,12 +119,12 @@ class LibraryEntry {
 		else if (this.list_entry.hasAttribute('monitored'))
 			list_bar.style.backgroundColor =
 			table_bar.style.backgroundColor =
-				'var(--accent-color)';
+				'var(--error-color)';
 
 		else
 			list_bar.style.backgroundColor =
 			table_bar.style.backgroundColor =
-				'var(--error-color)';
+				'var(--accent-color)';
 
 		return;
 	};
@@ -186,8 +195,8 @@ function populateLibrary(volumes, api_key) {
 
 		// Progress Bar
 		library_entry.setProgressBar(
-			volume.issues_downloaded_monitored,
-			volume.issue_count_monitored
+			volume.issues_downloaded_display,
+			volume.issue_count_display
 		);
 
 		// Add to view

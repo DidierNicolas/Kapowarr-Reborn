@@ -22,7 +22,8 @@ from backend.base.custom_exceptions import (ClientNotWorking,
                                             KeyNotFound)
 from backend.base.definitions import (BaseEnum, Constants, DateType,
                                       FileDate, GCDownloadSource, OSType,
-                                      ProxyType, SeedingHandling)
+                                      ProxyType, SeedingHandling,
+                                      VolumeProgressType)
 from backend.base.files import (are_folders_colliding, folder_path,
                                 uppercase_drive_letter)
 from backend.base.helpers import (CommaList, Singleton, build_proxy_url,
@@ -124,6 +125,7 @@ class PublicSettingsValues:
     delete_completed_downloads: bool = True
 
     date_type: DateType = DateType.COVER_DATE
+    volume_progress_type: VolumeProgressType = VolumeProgressType.MONITORED
 
     def todict(self, to_public: bool = True) -> Dict[str, Any]:
         """Convert the dataclass to a dictionary.
@@ -166,7 +168,8 @@ task_intervals = {
     # If there are tasks that should be run at the same time,
     # but per se after each other, put them in that order in the dict.
     'update_all': 3600, # every hour
-    'search_all': 86400 # every day
+    'search_all': 86400, # every day
+    'refresh_upcoming_releases': 86400 # every day
 }
 
 

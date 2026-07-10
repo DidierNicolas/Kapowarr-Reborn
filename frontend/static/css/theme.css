@@ -200,17 +200,20 @@ main > *:not(.tool-bar-container) { scrollbar-gutter: stable; }
 
 /* Library */
 #search-container {
-	min-width: min(360px, 42vw);
+	width: min(320px, 42vw);
+	min-width: 0;
 	margin: 0;
-	padding: 0 8px;
-	gap: 3px;
+	padding: 0;
+	gap: 0;
 	border: 1px solid var(--border-color);
-	border-radius: 999px;
+	border-radius: var(--radius-sm);
 	background: var(--foreground-color);
+	transition: border-color .15s ease, box-shadow .15s ease;
 }
-#search-input { width: 100%; min-height: 38px; border: 0 !important; box-shadow: none !important; color: var(--text-color); }
+#search-container:focus-within { border-color: var(--accent-color); box-shadow: 0 0 0 3px var(--accent-muted); }
+#search-input { width: 100%; min-height: 38px; border: 0 !important; border-radius: 0; box-shadow: none !important; color: var(--text-color); }
 #search-input::placeholder { color: var(--dimmed-text-color); }
-#start-search, #clear-search { width: 32px; }
+#start-search, #clear-search { width: 40px; }
 #library-container { padding: clamp(16px, 2.5vw, 32px); }
 #list-library { --entry-width: clamp(150px, 14vw, 205px); display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--entry-width), 1fr)); gap: clamp(15px, 2vw, 24px); }
 .space-taker { display: none; }

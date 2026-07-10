@@ -313,6 +313,13 @@ class DateType(BaseEnum):
     STORE_DATE = "store_date"
 
 
+class VolumeProgressType(BaseEnum):
+    """The issue set used for volume completeness on the library page."""
+
+    MONITORED = "monitored"
+    RELEASED = "released"
+
+
 class GeneralFileType(BaseEnum):
     METADATA = "metadata"
     COVER = "cover"

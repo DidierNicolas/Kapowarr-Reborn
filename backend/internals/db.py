@@ -16,7 +16,8 @@ from typing import Any, Dict, Iterable, Iterator, List, Type, Union
 from flask import g
 
 from backend.base.definitions import (Constants, DateType, FileDate, ProxyType,
-                                      SeedingHandling, SpecialVersion, T)
+                                      SeedingHandling, SpecialVersion, T,
+                                      VolumeProgressType)
 from backend.base.files import create_folder, folder_path
 from backend.base.helpers import CommaList, current_thread_id
 from backend.base.logging import LOGGER, set_log_level
@@ -302,6 +303,7 @@ def setup_db_adapters_and_converters() -> None:
     register_adapter(SeedingHandling, lambda e: e.value)
     register_adapter(SpecialVersion, lambda e: e.value)
     register_adapter(DateType, lambda e: e.value)
+    register_adapter(VolumeProgressType, lambda e: e.value)
     return
 
 
@@ -357,6 +359,20 @@ CREATE TABLE IF NOT EXISTS comicvine_search_cache(
 );
 CREATE INDEX IF NOT EXISTS comicvine_search_cache_fetched_at_index
     ON comicvine_search_cache(fetched_at);
+CREATE TABLE IF NOT EXISTS upcoming_releases(
+    id INTEGER PRIMARY KEY,
+    volume_id INTEGER NOT NULL,
+    source VARCHAR(20) NOT NULL,
+    source_url TEXT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    issue_number VARCHAR(20) NOT NULL,
+    release_date VARCHAR(10) NOT NULL,
+    fetched_at INTEGER NOT NULL,
+    FOREIGN KEY (volume_id) REFERENCES volumes(id) ON DELETE CASCADE,
+    UNIQUE(source, source_url)
+);
+CREATE INDEX IF NOT EXISTS upcoming_releases_date_index
+    ON upcoming_releases(release_date);
 CREATE TABLE IF NOT EXISTS root_folders(
     id INTEGER PRIMARY KEY,
     folder VARCHAR(254) UNIQUE NOT NULL

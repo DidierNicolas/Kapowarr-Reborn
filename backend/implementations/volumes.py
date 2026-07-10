@@ -26,7 +26,7 @@ from backend.base.definitions import (BaseEnum, Constants, FileData,
                                       GeneralFileData, IssueData,
                                       LibraryFilter, LibrarySorting,
                                       MonitorScheme, SpecialVersion,
-                                      VolumeData)
+                                      VolumeData, VolumeProgressType)
 from backend.base.files import (change_basefolder, create_folder,
                                 delete_empty_child_folders,
                                 delete_empty_parent_folders,
@@ -912,7 +912,7 @@ class Library:
                     WHERE volume_id = volumes.id
                 ),
                 issues_to_files AS (
-                    SELECT issue_id, monitored, f.id, size
+                    SELECT issue_id, monitored, i.date, f.id, size
                     FROM issues i
                     INNER JOIN issues_files if
                     INNER JOIN files f
@@ -933,11 +933,19 @@ class Library:
                     SELECT COUNT(id) FROM vol_issues WHERE monitored = 1
                 ) AS issue_count_monitored,
                 (
+                    SELECT COUNT(id) FROM vol_issues
+                    WHERE date IS NULL OR date <= DATE('now')
+                ) AS issue_count_released,
+                (
                     SELECT COUNT(DISTINCT issue_id) FROM issues_to_files
                 ) AS issues_downloaded,
                 (
                     SELECT COUNT(DISTINCT issue_id) FROM issues_to_files WHERE monitored = 1
                 ) AS issues_downloaded_monitored,
+                (
+                    SELECT COUNT(DISTINCT issue_id) FROM issues_to_files
+                    WHERE date IS NULL OR date <= DATE('now')
+                ) AS issues_downloaded_released,
                 (
                     SELECT SUM(size) FROM (SELECT DISTINCT id, size FROM issues_to_files)
                 ) AS total_size
@@ -946,6 +954,21 @@ class Library:
             ORDER BY {sort.value};
             """
         ).fetchalldict()
+
+        progress_type = Settings().sv.volume_progress_type
+        for volume in volumes:
+            if progress_type == VolumeProgressType.RELEASED:
+                volume["issue_count_display"] = volume["issue_count_released"]
+                volume["issues_downloaded_display"] = (
+                    volume["issues_downloaded_released"]
+                )
+            else:
+                volume["issue_count_display"] = (
+                    volume["issue_count_monitored"]
+                )
+                volume["issues_downloaded_display"] = (
+                    volume["issues_downloaded_monitored"]
+                )
 
         return volumes
 

@@ -21,6 +21,7 @@ from backend.features.download_queue import DownloadHandler
 from backend.features.search import auto_search
 from backend.implementations.conversion import mass_convert
 from backend.implementations.naming import mass_rename
+from backend.implementations.upcoming_releases import refresh_upcoming_releases
 from backend.implementations.volumes import Volume, refresh_and_scan
 from backend.internals.db import close_db, get_db
 from backend.internals.server import (TaskAddedEvent, TaskEndedEvent,
@@ -486,6 +487,33 @@ class SearchAll(Task):
                     for result in results
                 ]
         return downloads
+
+
+class RefreshUpcomingReleases(Task):
+    """Refresh future release dates from publisher calendars."""
+
+    stop = False
+    message = ''
+    action = 'refresh_upcoming_releases'
+    display_title = 'Refresh Upcoming Releases'
+    category = ''
+
+    @property
+    def volume_id(self) -> None:
+        return None
+
+    @property
+    def issue_id(self) -> None:
+        return None
+
+    def __init__(self) -> None:
+        return
+
+    def run(self) -> None:
+        self.message = 'Refreshing Marvel and Image release calendars'
+        WebSocket().emit(TaskStatusEvent(self.message))
+        refresh_upcoming_releases()
+        return
 
 
 # =====================

@@ -1199,3 +1199,24 @@ def _migrate_add_comicvine_search_cache():
             ON comicvine_search_cache(fetched_at);
     """)
     return
+
+
+@DatabaseMigrationHandler.register_handler(46)
+def _migrate_add_upcoming_releases():
+    get_db().executescript("""
+        CREATE TABLE IF NOT EXISTS upcoming_releases(
+            id INTEGER PRIMARY KEY,
+            volume_id INTEGER NOT NULL,
+            source VARCHAR(20) NOT NULL,
+            source_url TEXT NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            issue_number VARCHAR(20) NOT NULL,
+            release_date VARCHAR(10) NOT NULL,
+            fetched_at INTEGER NOT NULL,
+            FOREIGN KEY (volume_id) REFERENCES volumes(id) ON DELETE CASCADE,
+            UNIQUE(source, source_url)
+        );
+        CREATE INDEX IF NOT EXISTS upcoming_releases_date_index
+            ON upcoming_releases(release_date);
+    """)
+    return
