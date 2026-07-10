@@ -810,6 +810,12 @@ def api_volumes():
         if not isinstance(auto_search, bool):
             raise InvalidKeyValue('auto_search', auto_search)
 
+        metron_series_id = data.get('metron_series_id')
+        if metron_series_id is not None and not isinstance(
+            metron_series_id, int
+        ):
+            raise InvalidKeyValue('metron_series_id', metron_series_id)
+
         special_version = data.get('special_version') or None
         if special_version == 'auto':
             sv = None
@@ -827,7 +833,8 @@ def api_volumes():
             monitor_new_issues,
             volume_folder,
             sv,
-            auto_search
+            auto_search,
+            metron_series_id
         )
         volume_info = Library.get_volume(volume_id).get_public_data()
         return return_api(volume_info, code=201)

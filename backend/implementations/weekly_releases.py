@@ -22,7 +22,7 @@ from backend.internals.db import get_db
 from backend.internals.settings import Settings
 
 WP_POSTS_URL = "https://getcomics.org/wp-json/wp/v2/posts"
-METADATA_VERSION = 11
+METADATA_VERSION = 12
 MAX_RELEASE_DISTANCE_DAYS = 7
 MAX_VOLUME_CANDIDATES = 25
 issue_suffix_regex = compile(r"\s+#(?:\d+(?:\.\w+)?|[A-Za-z]+).*?$", IGNORECASE)
@@ -310,6 +310,7 @@ def refresh_weekly_releases(
             selected.update({
                 "match_source": "Metron",
                 "metron_issue_id": metron_match["metron_issue_id"],
+                "metron_series_id": metron_match["metron_series_id"],
                 "issue_comicvine_id": metron_match["issue_comicvine_id"],
                 "store_date": metron_match["store_date"],
                 "release_distance_days": metron_match[
@@ -435,6 +436,14 @@ def get_weekly_releases() -> dict:
             continue
         comic["library_volume_id"] = library["volume_id"]
         comic["library_issue_id"] = library["issue_id"]
+        if selected.get("metron_series_id") is not None:
+            cursor.execute("""
+                UPDATE volumes
+                SET metron_series_id = ?, last_cv_fetch = 0
+                WHERE id = ? AND metron_series_id IS NULL;
+                """,
+                (selected["metron_series_id"], library["volume_id"])
+            )
         if library["downloaded"]:
             comic["status"] = "downloaded"
         elif (library["issue_monitored"] if library["issue_id"] is not None

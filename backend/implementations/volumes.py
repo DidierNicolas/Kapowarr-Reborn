@@ -1103,7 +1103,8 @@ class Library:
         monitor_new_issues: bool = True,
         volume_folder: Union[str, None] = None,
         special_version: Union[SpecialVersion, None] = None,
-        auto_search: bool = False
+        auto_search: bool = False,
+        metron_series_id: Union[int, None] = None
     ) -> int:
         """Add a volume to the library.
 
@@ -1168,12 +1169,36 @@ class Library:
 
         vd = run(ComicVine().fetch_volume(comicvine_id))
 
+        if metron_series_id is not None:
+            from backend.implementations.metron import Metron
+            try:
+                metron_issues = Metron().fetch_series_issues(metron_series_id)
+                existing_numbers = {
+                    issue["issue_number"].casefold()
+                    for issue in vd["issues"] or []
+                }
+                vd["issues"] = list(vd["issues"] or []) + [
+                    issue for issue in metron_issues
+                    if issue["issue_number"].casefold() not in existing_numbers
+                ]
+                LOGGER.info(
+                    "Merged %d Metron-only issues into CV volume %d",
+                    len(vd["issues"] or []) - len(existing_numbers),
+                    comicvine_id
+                )
+            except Exception:
+                LOGGER.exception(
+                    "Failed to fetch Metron issues for series %d; using "
+                    "ComicVine issues only", metron_series_id
+                )
+
         cursor = get_db()
         with cursor:
             volume_id = cursor.execute(
                 """
                 INSERT INTO volumes(
                     comicvine_id,
+                    metron_series_id,
                     title,
                     alt_title,
                     year,
@@ -1189,7 +1214,7 @@ class Library:
                     special_version,
                     special_version_locked
                 ) VALUES (
-                    :comicvine_id, :title, :alt_title,
+                    :comicvine_id, :metron_series_id, :title, :alt_title,
                     :year, :publisher, :volume_number, :description,
                     :site_url, :monitored, :monitor_new_issues,
                     :root_folder, :custom_folder,
@@ -1198,6 +1223,7 @@ class Library:
                 """,
                 {
                     "comicvine_id": vd["comicvine_id"],
+                    "metron_series_id": metron_series_id,
                     "title": vd["title"],
                     "alt_title": (vd["aliases"] or [None])[0],
                     "year": vd["year"],
@@ -1401,7 +1427,7 @@ def refresh_and_scan(
     cursor = get_db()
     if volume_id:
         cursor.execute("""
-            SELECT comicvine_id, id, last_cv_fetch
+            SELECT comicvine_id, id, last_cv_fetch, metron_series_id
             FROM volumes
             WHERE id = ?
             LIMIT 1;
@@ -1411,7 +1437,7 @@ def refresh_and_scan(
 
     else:
         cursor.execute("""
-            SELECT comicvine_id, id, last_cv_fetch
+            SELECT comicvine_id, id, last_cv_fetch, metron_series_id
             FROM volumes
             WHERE last_cv_fetch <= ?
             ORDER BY last_cv_fetch ASC;
@@ -1423,9 +1449,14 @@ def refresh_and_scan(
             )
         )
 
+    volume_rows = cursor.fetchall()
     cv_to_id_fetch: Dict[int, Tuple[int, int]] = {
         e["comicvine_id"]: (e["id"], e["last_cv_fetch"])
-        for e in cursor
+        for e in volume_rows
+    }
+    cv_to_metron: Dict[int, int] = {
+        e["comicvine_id"]: e["metron_series_id"]
+        for e in volume_rows if e["metron_series_id"] is not None
     }
     if not cv_to_id_fetch:
         return
@@ -1438,7 +1469,8 @@ def refresh_and_scan(
 
     if not volume_id and allow_skipping:
         cv_id_to_issue_count: Dict[int, int] = dict(cursor.execute("""
-            SELECT v.comicvine_id, COUNT(i.id)
+            SELECT v.comicvine_id,
+                   SUM(CASE WHEN i.comicvine_id > 0 THEN 1 ELSE 0 END)
             FROM volumes v
             LEFT JOIN issues i
             ON v.id = i.volume_id
@@ -1505,6 +1537,29 @@ def refresh_and_scan(
     issue_datas = run(cv.fetch_issues(
         tuple(vd["comicvine_id"] for vd in filtered_volume_datas)
     ))
+    if cv_to_metron:
+        from backend.implementations.metron import Metron
+        metron = Metron()
+        existing_numbers = {
+            (issue["volume_id"], issue["issue_number"].casefold())
+            for issue in issue_datas
+        }
+        for vd in filtered_volume_datas:
+            metron_id = cv_to_metron.get(vd["comicvine_id"])
+            if metron_id is None:
+                continue
+            try:
+                for issue in metron.fetch_series_issues(metron_id):
+                    key = (vd["comicvine_id"], issue["issue_number"].casefold())
+                    if key in existing_numbers:
+                        continue
+                    issue["volume_id"] = vd["comicvine_id"]
+                    issue_datas.append(issue)
+                    existing_numbers.add(key)
+            except Exception:
+                LOGGER.exception(
+                    "Failed to refresh Metron issues for series %d", metron_id
+                )
     monitor_issues_volume_ids: Set[int] = set(first_of_subarrays(cursor.execute(
         "SELECT id FROM volumes WHERE monitor_new_issues = 1;"
     )))
@@ -1572,7 +1627,10 @@ def refresh_and_scan(
             (vd["comicvine_id"],)
         ).fetchall())
         for issue_cv, issue_id in issue_cv_to_id.items():
-            if issue_cv not in volume_issues_fetched[vd["comicvine_id"]]:
+            if (issue_cv > 0
+                    and issue_cv not in volume_issues_fetched[
+                        vd["comicvine_id"]
+                    ]):
                 # Issue is in database but not in response, so remove
                 Issue(issue_id).delete()
                 commit()

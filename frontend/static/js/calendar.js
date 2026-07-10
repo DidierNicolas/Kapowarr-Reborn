@@ -3,7 +3,11 @@ const CalendarEls = {
 	title: document.querySelector('#calendar-title'),
 	previous: document.querySelector('#previous-month'),
 	next: document.querySelector('#next-month'),
-	today: document.querySelector('#today')
+	today: document.querySelector('#today'),
+	dialog: document.querySelector('#calendar-day-dialog'),
+	dayTitle: document.querySelector('#calendar-day-title'),
+	dayIssues: document.querySelector('#calendar-day-issues'),
+	dayClose: document.querySelector('#calendar-day-close')
 };
 
 let displayedMonth = new Date();
@@ -14,6 +18,39 @@ function localDateString(date) {
 	const month = String(date.getMonth() + 1).padStart(2, '0');
 	const day = String(date.getDate()).padStart(2, '0');
 	return `${year}-${month}-${day}`;
+}
+
+function buildIssueEntry(issue, dateString, today) {
+	const entry = document.createElement('a');
+	entry.href = `${url_base}/volumes/${issue.volume_id}`;
+	if (issue.tentative) entry.classList.add('tentative');
+	if (issue.downloaded) {
+		entry.classList.add(issue.monitored ? 'downloaded-monitored' : 'downloaded-unmonitored');
+	} else if (dateString >= today) {
+		entry.classList.add('unreleased');
+	} else {
+		entry.classList.add(issue.monitored ? 'missing-monitored' : 'missing-unmonitored');
+	}
+
+	const name = document.createElement('strong');
+	name.innerText = issue.volume_title;
+	const details = document.createElement('span');
+	details.innerText = `Issue #${issue.issue_number}${issue.title ? ` · ${issue.title}` : ''}${issue.source ? ` · ${issue.source}` : ''}`;
+	entry.append(name, details);
+	entry.title = `${issue.volume_title} #${issue.issue_number}${issue.tentative ? ` · Tentative ${issue.source} date` : ''}`;
+	return entry;
+}
+
+function showDay(date, issues, today) {
+	const dateString = localDateString(date);
+	CalendarEls.dayTitle.innerText = date.toLocaleDateString(undefined, {
+		weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+	});
+	CalendarEls.dayIssues.innerHTML = '';
+	issues.forEach(issue => CalendarEls.dayIssues.appendChild(
+		buildIssueEntry(issue, dateString, today)
+	));
+	CalendarEls.dialog.showModal();
 }
 
 function renderCalendar(issues) {
@@ -52,25 +89,19 @@ function renderCalendar(issues) {
 		number.innerText = date.getDate();
 		cell.appendChild(number);
 
-		for (const issue of issuesByDate[dateString] || []) {
-			const entry = document.createElement('a');
-			entry.href = `${url_base}/volumes/${issue.volume_id}`;
-			if (issue.tentative) entry.classList.add('tentative');
-			if (issue.downloaded) {
-				entry.className = issue.monitored ? 'downloaded-monitored' : 'downloaded-unmonitored';
-			} else if (dateString >= today) {
-				entry.className = 'unreleased';
-			} else {
-				entry.className = issue.monitored ? 'missing-monitored' : 'missing-unmonitored';
-			}
-
-			const name = document.createElement('strong');
-			name.innerText = issue.volume_title;
-			const details = document.createElement('span');
-			details.innerText = `Issue #${issue.issue_number}${issue.title ? ` · ${issue.title}` : ''}${issue.source ? ` · ${issue.source}` : ''}`;
-			entry.append(name, details);
-			entry.title = `${issue.volume_title} #${issue.issue_number}${issue.tentative ? ` · Tentative ${issue.source} date` : ''}`;
-			cell.appendChild(entry);
+		const dayIssues = issuesByDate[dateString] || [];
+		if (dayIssues.length > 2) cell.classList.add('has-overflow');
+		dayIssues.slice(0, 2).forEach(issue => cell.appendChild(
+			buildIssueEntry(issue, dateString, today)
+		));
+		if (dayIssues.length > 2) {
+			const more = document.createElement('button');
+			more.type = 'button';
+			more.className = 'calendar-more';
+			more.innerText = `+${dayIssues.length - 2} more`;
+			more.setAttribute('aria-label', `Show all ${dayIssues.length} issues on ${dateString}`);
+			more.onclick = () => showDay(date, dayIssues, today);
+			cell.appendChild(more);
 		}
 
 		CalendarEls.grid.appendChild(cell);
@@ -100,3 +131,8 @@ usingApiKey().then(apiKey => {
 		loadCalendar(apiKey);
 	};
 });
+
+CalendarEls.dayClose.onclick = () => CalendarEls.dialog.close();
+CalendarEls.dialog.onclick = event => {
+	if (event.target === CalendarEls.dialog) CalendarEls.dialog.close();
+};

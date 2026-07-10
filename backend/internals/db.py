@@ -386,6 +386,7 @@ CREATE TABLE IF NOT EXISTS root_folders(
 CREATE TABLE IF NOT EXISTS volumes(
     id INTEGER PRIMARY KEY,
     comicvine_id INTEGER NOT NULL,
+    metron_series_id INTEGER,
     title VARCHAR(255) NOT NULL,
     alt_title VARCHAR(255),
     year INTEGER(5),

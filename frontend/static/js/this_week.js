@@ -75,7 +75,8 @@ function addWeeklyVolume() {
 		monitor_new_issues: WeekEls.add.monitorIssues.value === 'true',
 		volume_folder: folder !== suggestedVolumeFolder ? folder : '',
 		special_version: WeekEls.add.specialVersion.value || null,
-		auto_search: WeekEls.add.autoSearch.checked
+		auto_search: WeekEls.add.autoSearch.checked,
+		metron_series_id: activeVolume.metron_series_id || null
 	};
 	setLocalStorage({
 		monitor_new_volume: data.monitor,

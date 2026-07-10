@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from re import compile
 from typing import Dict, List, Optional
 
-from backend.base.helpers import Session
-from backend.base.helpers import normalise_query_string
+from backend.base.file_extraction import extract_issue_number
+from backend.base.helpers import Session, normalise_query_string
 from backend.base.logging import LOGGER
 from backend.implementations.matching import match_title
 from backend.internals.settings import Settings
@@ -130,6 +130,7 @@ class Metron:
                 )
                 return {
                     "metron_issue_id": issue.get("id"),
+                    "metron_series_id": series.get("id"),
                     "issue_comicvine_id": issue.get("cv_id"),
                     "series_comicvine_id": series_cv_id,
                     "store_date": issue.get("store_date"),
@@ -169,3 +170,28 @@ class Metron:
             len(matches), len(comics)
         )
         return matches
+
+    def fetch_series_issues(self, series_id: int) -> List[dict]:
+        """Return lightweight issue metadata suitable for library insertion."""
+        if not self.enabled:
+            return []
+        issues = self._get_pages(f"/series/{series_id}/issue_list/", {})
+        result = []
+        for issue in issues:
+            number = str(issue.get("number") or "").replace("/", "-").strip()
+            if not number or not issue.get("id"):
+                continue
+            calculated = extract_issue_number(number)
+            if isinstance(calculated, tuple):
+                calculated = calculated[0]
+            result.append({
+                # Metron IDs are globally unique. Negative values distinguish
+                # these rows from real ComicVine issue IDs.
+                "comicvine_id": -int(issue["id"]),
+                "issue_number": number,
+                "calculated_issue_number": calculated or 0.0,
+                "title": None,
+                "date": issue.get("store_date") or issue.get("cover_date"),
+                "description": ""
+            })
+        return result

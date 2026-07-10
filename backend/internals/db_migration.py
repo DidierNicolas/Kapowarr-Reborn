@@ -1233,3 +1233,11 @@ def _migrate_add_weekly_releases():
         );
     """)
     return
+
+
+@DatabaseMigrationHandler.register_handler(48)
+def _migrate_add_metron_series_to_volumes():
+    get_db().execute(
+        "ALTER TABLE volumes ADD COLUMN metron_series_id INTEGER;"
+    )
+    return
