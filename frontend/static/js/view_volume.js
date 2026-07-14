@@ -36,6 +36,7 @@ const ViewEls = {
 		manual_search: document.querySelector('#manualsearch-button'),
 		rename: document.querySelector('#rename-button'),
 		convert: document.querySelector('#convert-button'),
+		comicinfo: document.querySelector('#comicinfo-button'),
 		manage: document.querySelector('#manage-button'),
 		files: document.querySelector('#files-button'),
 		edit: document.querySelector('#edit-button'),
@@ -307,6 +308,21 @@ function autosearchIssue(issue_id, api_key) {
 		cmd: 'auto_search_issue',
 		volume_id: volume_id,
 		issue_id: issue_id
+	});
+};
+
+function writeComicInfo(api_key) {
+	const button_info = task_to_button[`write_comicinfo#${volume_id}`];
+	const icon = button_info.button.querySelector('img');
+	icon.src = button_info.loading_icon;
+	icon.classList.add('spinning');
+
+	sendAPI('POST', '/system/tasks', api_key, {}, {
+		cmd: 'write_comicinfo',
+		volume_id: volume_id
+	}).catch(() => {
+		icon.src = button_info.icon;
+		icon.classList.remove('spinning');
 	});
 };
 
@@ -949,6 +965,7 @@ usingApiKey()
 	ViewEls.tool_bar.manual_search.onclick = e => showManualSearch(api_key);
 	ViewEls.tool_bar.rename.onclick = e => showRename(api_key);
 	ViewEls.tool_bar.convert.onclick = e => showConvert(api_key);
+	ViewEls.tool_bar.comicinfo.onclick = e => writeComicInfo(api_key);
 	ViewEls.tool_bar.manage.onclick = e => showManageIssues(api_key);
 	ViewEls.tool_bar.edit.onclick = e => showEdit(api_key);
 

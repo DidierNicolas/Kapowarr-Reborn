@@ -17,6 +17,7 @@ from backend.base.files import (copy_directory, delete_file_folder,
 from backend.base.logging import LOGGER
 from backend.implementations.blocklist import add_to_blocklist
 from backend.implementations.conversion import mass_convert
+from backend.implementations.comicinfo import write_comicinfo_for_files
 from backend.implementations.converters import extract_files_from_folder
 from backend.implementations.download_clients import TorrentDownload
 from backend.implementations.file_matching import scan_files
@@ -282,6 +283,29 @@ def set_file_properties(download: Download) -> None:
     return
 
 
+def write_comicinfo(download: Download) -> None:
+    """Add ComicInfo.xml to final CBZ files when metadata writing is enabled."""
+    if not Settings().sv.write_comicinfo:
+        return
+
+    # Conversion can leave superseded paths in download.files. Intersect the
+    # download paths with registered files so unrelated files for the same
+    # issue are not rewritten.
+    registered_files = FilesDB.fetch(
+        issue_id=download.issue_id
+    ) if download.issue_id else FilesDB.fetch(volume_id=download.volume_id)
+    download_paths = {file for file in download.files if exists(file)}
+    result = write_comicinfo_for_files(
+        file['filepath'] for file in registered_files
+        if file['filepath'] in download_paths
+    )
+    LOGGER.info(
+        'ComicInfo.xml post-processing finished: '
+        f'{result.written} written, {result.skipped} skipped, {result.failed} failed'
+    )
+    return
+
+
 # region Post-Processors
 class PostProcessor:
     actions_success = [
@@ -291,6 +315,7 @@ class PostProcessor:
         rename_with_proper_extension,
         add_file_to_database,
         convert_file,
+        write_comicinfo,
         set_file_properties
     ]
 
@@ -369,6 +394,7 @@ class PostProcessorTorrentsComplete(PostProcessor):
         add_to_history,
         move_torrent_to_dest,
         convert_file,
+        write_comicinfo,
         set_file_properties
     ]
 
@@ -383,6 +409,7 @@ class PostProcessorTorrentsCopy(PostProcessor):
         add_to_history,
         copy_file_torrent,
         convert_file,
+        write_comicinfo,
         set_file_properties,
         reset_file_link
     ]

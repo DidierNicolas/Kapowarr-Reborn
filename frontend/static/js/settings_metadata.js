@@ -3,6 +3,7 @@ function fillSettings(api_key) {
 	.then(json => {
 		document.querySelector('#date-type-input').value = json.result.date_type;
 		document.querySelector('#volume-progress-type-input').value = json.result.volume_progress_type;
+		document.querySelector('#write-comicinfo-input').checked = json.result.write_comicinfo;
 	});
 };
 
@@ -10,7 +11,8 @@ function saveSettings(api_key) {
 	document.querySelector("#save-button p").innerText = 'Saving';
 	const data = {
 		'date_type': document.querySelector('#date-type-input').value,
-		'volume_progress_type': document.querySelector('#volume-progress-type-input').value
+		'volume_progress_type': document.querySelector('#volume-progress-type-input').value,
+		'write_comicinfo': document.querySelector('#write-comicinfo-input').checked
 	};
 	sendAPI('PUT', '/settings', api_key, {}, data)
 	.then(response => response.json())

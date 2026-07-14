@@ -128,6 +128,7 @@ class PublicSettingsValues:
 
     date_type: DateType = DateType.COVER_DATE
     volume_progress_type: VolumeProgressType = VolumeProgressType.MONITORED
+    write_comicinfo: bool = False
 
     def todict(self, to_public: bool = True) -> Dict[str, Any]:
         """Convert the dataclass to a dictionary.

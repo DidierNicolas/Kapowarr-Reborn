@@ -20,6 +20,7 @@ from backend.base.logging import LOGGER
 from backend.features.download_queue import DownloadHandler
 from backend.features.search import auto_search
 from backend.implementations.conversion import mass_convert
+from backend.implementations.comicinfo import write_comicinfo_for_volume
 from backend.implementations.naming import mass_rename
 from backend.implementations.upcoming_releases import refresh_upcoming_releases
 from backend.implementations.weekly_releases import refresh_weekly_releases
@@ -488,6 +489,43 @@ class SearchAll(Task):
                     for result in results
                 ]
         return downloads
+
+
+class WriteComicInfoVolume(Task):
+    """Write ComicInfo.xml metadata to the matched CBZ files of one volume."""
+
+    stop = False
+    message = ''
+    action = 'write_comicinfo'
+    display_title = 'Write ComicInfo.xml'
+    category = ''
+
+    @property
+    def volume_id(self) -> int:
+        return self._volume_id
+
+    @property
+    def issue_id(self) -> None:
+        return None
+
+    def __init__(self, volume_id: int) -> None:
+        self._volume_id = volume_id
+        return
+
+    def run(self) -> None:
+        ws = WebSocket()
+        volume_title = Volume(self._volume_id).vd.title
+        self.message = f'Writing ComicInfo.xml for {volume_title}'
+        ws.emit(TaskStatusEvent(self.message))
+        result = write_comicinfo_for_volume(self._volume_id)
+
+        self.message = (
+            f'ComicInfo.xml complete: {result.written} written, '
+            f'{result.skipped} skipped, {result.failed} failed'
+        )
+        LOGGER.info(self.message)
+        ws.emit(TaskStatusEvent(self.message))
+        return
 
 
 class RefreshUpcomingReleases(Task):
