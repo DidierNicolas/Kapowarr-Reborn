@@ -10,6 +10,7 @@ from backend.base.helpers import get_subclasses
 from backend.base.logging import LOGGER
 from backend.features.download_queue import DownloadHandler
 from backend.features.search import auto_search
+from backend.implementations.comicinfo import write_comicinfo_for_volume
 from backend.implementations.conversion import mass_convert
 from backend.implementations.file_processing import (mass_set_file_date,
                                                      mass_set_ownership,
@@ -170,6 +171,28 @@ class MassEditorConvert(MassEditorAction):
             ))
 
             mass_convert(volume_id)
+        return
+
+
+class MassEditorComicInfo(MassEditorAction):
+    identifier = 'comicinfo'
+
+    def run(self, **kwargs) -> None:
+        LOGGER.info(
+            'Using mass editor, writing ComicInfo.xml for volumes: %s',
+            self.volume_ids
+        )
+
+        ws = WebSocket()
+        total_items = len(self.volume_ids)
+        for item_index, volume_id in enumerate(iter_commit(self.volume_ids)):
+            ws.emit(MassEditorStatusEvent(
+                self.identifier,
+                item_index + 1,
+                total_items
+            ))
+            write_comicinfo_for_volume(volume_id)
+
         return
 
 

@@ -37,7 +37,8 @@ const library_els = {
 		toggle: document.querySelector('#massedit-toggle'),
 		select_all: document.querySelector('#selectall-input'),
 		cancel: document.querySelector('#cancel-massedit'),
-		progress: document.querySelector("#massedit-progress")
+		progress: document.querySelector("#massedit-progress"),
+		selected_count: document.querySelector('#massedit-selection-count')
 	}
 };
 
@@ -206,6 +207,10 @@ function populateLibrary(volumes, api_key) {
 
 	library_els.views.list.insertBefore(list_fragment, space_taker);
 	library_els.views.table.appendChild(table_fragment);
+	library_els.views.table.querySelectorAll('input[type="checkbox"]').forEach(
+		checkbox => checkbox.onchange = updateMassEditSelection
+	);
+	updateMassEditSelection();
 };
 
 function fetchLibrary(api_key) {
@@ -259,12 +264,27 @@ function fetchStats(api_key) {
 //
 // Mass Edit
 //
-function runAction(api_key, action, args={}) {
-	showLibraryPage(library_els.pages.loading);
+function updateMassEditSelection() {
+	const selected = library_els.views.table.querySelectorAll(
+		'input[type="checkbox"]:checked'
+	).length;
 
+	library_els.mass_edit.selected_count.innerText =
+		`${selected} volume${selected === 1 ? '' : 's'} selected`;
+	library_els.mass_edit.bar.querySelectorAll('button[data-action]').forEach(
+		button => button.disabled = selected === 0
+	);
+};
+
+function runAction(api_key, action, args={}) {
 	const volume_ids = [...library_els.views.table.querySelectorAll(
 		'input[type="checkbox"]:checked'
-	)].map(v => parseInt(v.parentNode.parentNode.dataset.id))
+	)].map(v => parseInt(v.parentNode.parentNode.dataset.id));
+
+	if (volume_ids.length === 0)
+		return;
+
+	showLibraryPage(library_els.pages.loading);
 
 	sendAPI('POST', '/masseditor', api_key, {}, {
 		'volume_ids': volume_ids,
@@ -315,9 +335,13 @@ usingApiKey()
     library_els.mass_edit.cancel.onclick =
         e => {
             const toggle = library_els.mass_edit.toggle;
-            if (toggle.hasAttribute('checked'))
+            if (toggle.hasAttribute('checked')) {
                 toggle.removeAttribute('checked');
-            else {
+				library_els.mass_edit.select_all.checked = false;
+				library_els.views.table.querySelectorAll('input[type="checkbox"]')
+					.forEach(checkbox => checkbox.checked = false);
+				updateMassEditSelection();
+			} else {
                 const select = document.querySelector('select[name="root_folder_id"]');
                 if (select.querySelector('option') === null) {
                     fetchAPI('/rootfolder', api_key)
@@ -335,12 +359,12 @@ usingApiKey()
             }
         };
 	library_els.mass_edit.bar.querySelectorAll('.action-divider > button[data-action]').forEach(
-		b => b.onclick = e => runAction(api_key, e.target.dataset.action)
+		b => b.onclick = e => runAction(api_key, e.currentTarget.dataset.action)
 	);
 	library_els.mass_edit.bar.querySelector('button[data-action="delete"]').onclick =
 		e => runAction(
 			api_key,
-			e.target.dataset.action,
+			e.currentTarget.dataset.action,
 			{
 				'delete_folder': document.querySelector(
 					'select[name="delete_folder"]'
@@ -350,7 +374,7 @@ usingApiKey()
 	library_els.mass_edit.bar.querySelector('button[data-action="root_folder"]').onclick =
 		e => runAction(
 			api_key,
-			e.target.dataset.action,
+			e.currentTarget.dataset.action,
 			{
 				'root_folder_id': parseInt(document.querySelector(
 					'select[name="root_folder_id"]'
@@ -360,7 +384,7 @@ usingApiKey()
 	library_els.mass_edit.bar.querySelector('button[data-action="monitoring_scheme"]').onclick =
 		e => runAction(
 			api_key,
-			e.target.dataset.action,
+			e.currentTarget.dataset.action,
 			{
 				'monitoring_scheme': document.querySelector(
 					'select[name="monitoring_scheme"]'
@@ -388,5 +412,8 @@ usingApiKey()
 });
 library_els.search.container.action = 'javascript:searchLibrary();';
 library_els.mass_edit.select_all.onchange =
-	e => library_els.views.table.querySelectorAll('input[type="checkbox"]')
+	e => {
+		library_els.views.table.querySelectorAll('input[type="checkbox"]')
 			.forEach(c => c.checked = library_els.mass_edit.select_all.checked);
+		updateMassEditSelection();
+	};

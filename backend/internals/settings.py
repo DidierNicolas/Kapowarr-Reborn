@@ -297,9 +297,13 @@ class Settings(metaclass=Singleton):
         old_settings = self.get_settings()
 
         get_db().executemany(
-            "UPDATE config SET value = ? WHERE key = ?;",
-            ((v, k) for k, v in formatted_data.items())
+            """
+            INSERT INTO config(key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """,
+            ((k, v) for k, v in formatted_data.items())
         )
+        commit()
 
         if (
             'log_level' in data

@@ -341,38 +341,106 @@ main:not(:has(#massedit-toggle:checked)) #table-container :where(td, th):first-c
 	z-index: 2;
 
 	display: none;
-	flex-wrap: wrap;
-	gap: 1rem;
+	flex-direction: column;
+	gap: .85rem;
 
-	padding: .5rem;
-	border-radius: 4px;
-	background-color: var(--tool-bar-color);
+	padding: 1rem;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-md);
+	background-color: var(--foreground-color);
+	box-shadow: var(--shadow-sm);
 }
 
 main:has(#massedit-toggle:checked) .action-bar {
 	display: flex;
 }
 
+.action-bar-header,
+.action-bar-header > div,
+.action-groups,
 .action-divider {
 	display: flex;
+	align-items: center;
+	gap: .65rem;
+}
+
+.action-bar-header {
+	justify-content: space-between;
+	padding-bottom: .8rem;
+	border-bottom: 1px solid var(--border-color);
+}
+
+.action-bar-header strong {
+	font-size: 1rem;
+}
+
+#massedit-selection-count {
+	color: var(--dimmed-text-color);
+	font-size: .8rem;
+}
+
+.action-groups {
+	align-items: stretch;
 	flex-wrap: wrap;
-	gap: 1rem;
+	gap: .75rem;
 }
 
-.action-bar button {
-	min-width: 5rem;
+.action-divider {
+	position: relative;
+	align-content: flex-start;
+	align-items: stretch;
+	flex-wrap: wrap;
+	gap: .4rem;
+	padding: 1.8rem .55rem .55rem;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-sm);
+	background: var(--background-color);
+}
 
-	border: 2px solid var(--border-color);
-	border-radius: 4px;
-	padding: .4rem .5rem;
+.action-divider::before {
+	content: attr(data-group);
+	position: absolute;
+	top: .45rem;
+	left: .65rem;
+	color: var(--dimmed-text-color);
+	font-size: .67rem;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+}
+
+#table-container .action-bar button {
+	min-height: 2.4rem;
+	min-width: auto;
+
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	padding: .45rem .7rem;
 	color: var(--text-color);
-	background-color: var(--background-color);
+	background-color: var(--foreground-color);
+	font-weight: 600;
 
-	transition: background-color 100ms linear;
+	transition: background-color 100ms linear, border-color 100ms linear;
 }
 
-.action-bar button:hover {
+#table-container .action-bar button:hover {
 	background-color: var(--foreground-color);
+	border-color: var(--accent-color);
+}
+
+#table-container .action-bar button:disabled {
+	cursor: not-allowed;
+	opacity: .45;
+	border-color: var(--border-color);
+}
+
+#table-container .action-bar button[data-action="comicinfo"] {
+	color: var(--accent-color);
+	border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+}
+
+main:has(#massedit-toggle:checked) .table-entry:has(input[type="checkbox"]:checked) {
+	background-color: color-mix(in srgb, var(--accent-color) 8%, var(--foreground-color));
 }
 
 .option-container {
@@ -380,27 +448,40 @@ main:has(#massedit-toggle:checked) .action-bar {
     justify-content: space-between;
 
 	overflow: hidden;
-	border-radius: 4px;
-	border: 2px solid var(--border-color);
-	background-color: var(--background-color);
+	min-height: 2.4rem;
+	border-radius: 6px;
+	border: 1px solid var(--border-color);
+	background-color: var(--foreground-color);
 }
 
-.option-container button {
-    min-width: 6.8rem;
+#table-container .option-container button {
 	border-radius: 0px;
 	border: none;
+	border-right: 1px solid var(--border-color);
 }
 
 .option-container select {
-    flex-grow: 1;
+	flex-grow: 1;
+	min-height: auto;
+	max-width: 12rem;
+	border: 0;
+	border-radius: 0;
+	padding-inline: .55rem 1.8rem;
 	height: 100%;
-	background-color: var(--background-color);
+	background-color: var(--foreground-color);
 	color: var(--text-color);
 }
 
-#cancel-massedit {
-	background-color: var(--error-color);
-	border-color: var(--error-color);
+#table-container #cancel-massedit {
+	background: transparent;
+}
+
+#table-container .danger-actions button[data-action="delete"] {
+	color: var(--error-color);
+}
+
+.danger-actions {
+	border-color: color-mix(in srgb, var(--error-color) 35%, var(--border-color));
 }
 
 main:has(#massedit-toggle:checked) #lib-stats {
@@ -409,8 +490,10 @@ main:has(#massedit-toggle:checked) #lib-stats {
 
 @media (max-width: 860px) {
 	.action-bar {
-        flex-direction: column;
 		justify-content: center;
+	}
+	.action-groups {
+		flex-direction: column;
 	}
 	.action-divider {
 		width: 100%;

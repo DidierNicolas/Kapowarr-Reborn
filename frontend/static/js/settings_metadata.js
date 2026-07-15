@@ -17,6 +17,8 @@ function saveSettings(api_key) {
 	sendAPI('PUT', '/settings', api_key, {}, data)
 	.then(response => response.json())
 	.then(json => {
+		document.querySelector('#write-comicinfo-input').checked =
+			json.result.write_comicinfo;
 		document.querySelector("#save-button p").innerText = 'Saved';
 	})
 	.catch(e => {
@@ -30,5 +32,8 @@ function saveSettings(api_key) {
 usingApiKey()
 .then(api_key => {
 	fillSettings(api_key);
-	document.querySelector('#save-button').onclick = e => saveSettings(api_key);
+	document.querySelector('#save-button').onclick = e => {
+		e.preventDefault();
+		saveSettings(api_key);
+	};
 });

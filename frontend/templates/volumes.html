@@ -132,32 +132,31 @@
 		</div>
 		<div id="table-container">
 			<section class="action-bar" aria-label="Action Bar">
-                <div class="action-divider">
-                    <button id="cancel-massedit">Quit</button>
-                </div>
-				<div class="action-divider">
-					<div class="option-container">
-						<button data-action="delete">Delete</button>
-						<select name="delete_folder" id="delete-folder-input" aria-label="Keep or delete the volume folder">
-							<option value="true">Delete Volume Folder</option>
-							<option value="false" selected>Keep Volume Folder</option>
-						</select>
+				<header class="action-bar-header">
+					<div>
+						<strong>Mass Edit</strong>
+						<span id="massedit-selection-count">0 volumes selected</span>
 					</div>
+					<button id="cancel-massedit">Done</button>
+				</header>
+				<div class="action-groups">
+				<div class="action-divider" data-group="Library">
 					<div class="option-container">
 						<button data-action="root_folder">Set Root Folder</button>
 						<select name="root_folder_id" id="rf-id-input" aria-label="Set the root folder for the selected volumes">
                         </select>
 					</div>
 				</div>
-				<div class="action-divider">
+				<div class="action-divider" data-group="Files & Metadata">
 					<button data-action="rename">Rename</button>
 					<button data-action="convert">Convert</button>
-                    <button data-action="unmonitor">Unmonitor</button>
-                    <button data-action="monitor">Monitor</button>
+					<button data-action="comicinfo">Write ComicInfo.xml</button>
 				</div>
-				<div class="action-divider">
+				<div class="action-divider" data-group="Monitoring">
+					<button data-action="monitor">Monitor</button>
+					<button data-action="unmonitor">Unmonitor</button>
 					<div class="option-container">
-						<button data-action="monitoring_scheme">Apply Monitoring Scheme</button>
+						<button data-action="monitoring_scheme">Apply Scheme</button>
 						<select name="monitoring_scheme" id="monitoring-scheme-input" aria-label="Apply a monitoring scheme for the selected volumes">
 							<option value="all" selected>All</option>
 							<option value="missing">Missing</option>
@@ -165,9 +164,19 @@
 						</select>
 					</div>
 				</div>
-				<div class="action-divider">
-                    <button data-action="update">Refresh & Scan</button>
-                    <button data-action="search">Auto Search</button>
+				<div class="action-divider" data-group="Automation">
+					<button data-action="update">Refresh & Scan</button>
+					<button data-action="search">Auto Search</button>
+				</div>
+				<div class="action-divider danger-actions" data-group="Danger Zone">
+					<div class="option-container">
+						<button data-action="delete">Delete</button>
+						<select name="delete_folder" id="delete-folder-input" aria-label="Keep or delete the volume folder">
+							<option value="false" selected>Keep folders</option>
+							<option value="true">Delete folders</option>
+						</select>
+					</div>
+				</div>
 				</div>
 			</section>
 
