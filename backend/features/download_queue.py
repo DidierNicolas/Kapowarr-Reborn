@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from asyncio import gather, run
+from asyncio import run
 from os import listdir
 from os.path import basename, join
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple, Type, Union
@@ -434,16 +434,9 @@ class DownloadHandler(metaclass=Singleton):
                 await gcp.load_data()
 
             except EnqueuingDownloadFailure as e:
-                add_to_blocklist(
-                    web_link=link,
-                    web_title=None,
-                    web_sub_title=None,
-                    download_link=None,
-                    source=None,
-                    volume_id=volume_id,
-                    issue_id=issue_id,
-                    reason=BlocklistReason.LINK_BROKEN
-                )
+                # An unavailable article can be temporary throttling,
+                # Cloudflare, or a network failure. Keep it retryable instead
+                # of permanently classifying it as a broken link.
                 LOGGER.warning(
                     f'Unable to extract download links from source; fail_reason="{e.reason.value}"'
                 )
@@ -486,10 +479,12 @@ class DownloadHandler(metaclass=Singleton):
         add_args: Iterable[Tuple[str, int, Union[int, None], bool]]
     ) -> None:
         async def add_wrapper():
-            await gather(
-                *(self.add(*entry)
-                for entry in add_args)
-            )
+            # Search All can produce dozens of GetComics pages. Fetching every
+            # page and mirror concurrently triggers provider throttling and can
+            # make valid links look broken. Enqueue candidates sequentially;
+            # the normal download queue still controls the actual downloads.
+            for entry in add_args:
+                await self.add(*entry)
 
         run(add_wrapper())
         return
