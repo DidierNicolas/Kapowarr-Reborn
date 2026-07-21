@@ -80,6 +80,12 @@ class DownloadHandler(metaclass=Singleton):
             if e.source == DownloadSource.MEGA:
                 self._remove_mega(exclude_id=download.id)
 
+        except Exception:
+            # A provider implementation must never be allowed to kill its
+            # worker while leaving a permanent "Downloading" queue entry.
+            LOGGER.exception('Unhandled error while downloading %s', download.id)
+            download.stop(DownloadState.FAILED_STATE)
+
         ws.emit(status_event)
         if download.state == DownloadState.SHUTDOWN_STATE:
             PostProcessor.shutdown(download)

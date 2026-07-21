@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 file_extension_regex = compile(r'(?<=\.|\/)[\w\d]{2,4}(?=$|;|\s|\")', IGNORECASE)
 file_name_regex = compile(r'filename(?:=\"|\*=UTF-8\'\')(.*?)\.[a-z]{2,4}\"?$', IGNORECASE)
 extract_mediafire_regex = compile(r'window.location.href\s?=\s?\'https://download\d+\.mediafire.com/.*?(?=\')', IGNORECASE)
-DOWNLOAD_CHUNK_SIZE = 4194304 # 4MB Chunks
+DOWNLOAD_CHUNK_SIZE = 262144 # 256KB chunks for responsive queue progress
 MEDIAFIRE_FOLDER_LINK = "https://www.mediafire.com/api/1.5/file/zip.php"
 WETRANSFER_API_LINK = "https://wetransfer.com/api/v4/transfers/{transfer_id}/download"
 # autopep8: on
@@ -311,10 +311,13 @@ class BaseDirectDownload(Download):
                 tries_left -= 1
                 if not self._supports_range_header:
                     size_downloaded = 0
+                    f.seek(0)
+                    f.truncate()
 
-                with self._fetch_pure_link(start_byte=size_downloaded) as r:
-                    self.__r = r
-                    try:
+                try:
+                    with self._fetch_pure_link(start_byte=size_downloaded) as r:
+                        self.__r = r
+                        r.raise_for_status()
                         for chunk in r.iter_content(
                             chunk_size=DOWNLOAD_CHUNK_SIZE
                         ):
@@ -354,12 +357,19 @@ class BaseDirectDownload(Download):
                             # Stopping download
                             break
 
-                    except RequestException:
-                        # Connection error, packet loss, etc. Just try again
-                        pass
+                except RequestException as exc:
+                    # This also catches failures while opening the streaming
+                    # response. Previously those escaped the worker thread and
+                    # left the queue entry stuck at "Downloading" forever.
+                    LOGGER.warning(
+                        'Download request failed for %s (%d attempts remain): %s',
+                        self.download_link,
+                        tries_left,
+                        exc
+                    )
 
-                    finally:
-                        self.__r = None
+                finally:
+                    self.__r = None
             else:
                 # Failed to download file
                 self._state = DownloadState.FAILED_STATE
