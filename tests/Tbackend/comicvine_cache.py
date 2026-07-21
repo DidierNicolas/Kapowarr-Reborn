@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+from sqlite3 import OperationalError
 from unittest.mock import AsyncMock, Mock, patch
 
 from backend.base.custom_exceptions import CVRateLimitReached
@@ -87,6 +88,34 @@ class ComicVineSearchCache(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, ['live'])
         store.assert_called_once_with('Absolute Batman', api_result)
+
+    async def test_locked_cache_does_not_discard_api_result(self):
+        api_result = [{'id': 1}]
+        with (
+            patch.object(
+                self.cv,
+                '_ComicVine__get_cached_search',
+                return_value=None
+            ),
+            patch.object(
+                self.cv,
+                '_ComicVine__search_query',
+                new=AsyncMock(return_value=api_result)
+            ),
+            patch.object(
+                self.cv,
+                '_ComicVine__store_cached_search',
+                side_effect=OperationalError('database is locked')
+            ),
+            patch.object(
+                self.cv,
+                '_ComicVine__format_search_output',
+                return_value=['live']
+            )
+        ):
+            result = await self.cv.search_volumes('Absolute Batman')
+
+        self.assertEqual(result, ['live'])
 
 
 if __name__ == '__main__':

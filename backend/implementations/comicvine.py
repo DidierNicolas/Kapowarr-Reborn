@@ -7,6 +7,7 @@ Search for volumes/issues and fetch metadata for them on ComicVine
 from asyncio import gather, run, sleep
 from json import JSONDecodeError, dumps, loads
 from re import IGNORECASE, compile
+from sqlite3 import OperationalError
 from time import time
 from typing import Any, AsyncGenerator, Dict, Iterable, List, Sequence, Union
 
@@ -738,6 +739,9 @@ class ComicVine:
             """,
             (round(time()) - self.search_cache_stale_ttl,)
         )
+        # A weekly refresh can perform dozens of searches. Do not retain
+        # SQLite's single writer lock until the whole HTTP request finishes.
+        cursor.connection.commit()
 
     async def search_volumes(
         self,
@@ -807,7 +811,18 @@ class ComicVine:
                 return []
             raise
 
-        self.__store_cached_search(query, results)
+        try:
+            self.__store_cached_search(query, results)
+        except OperationalError as exc:
+            # Search caching is an optimization. Database contention must not
+            # discard a successful ComicVine response or break Weekly Comics.
+            if 'locked' not in str(exc).casefold():
+                raise
+            LOGGER.warning(
+                'ComicVine search cache is busy; returning uncached results '
+                'for %s',
+                query
+            )
         if not results:
             return []
 
