@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from asyncio import run
+from asyncio import run, wait_for
 from os import listdir
 from os.path import basename, join
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple, Type, Union
@@ -40,6 +40,10 @@ from backend.internals.settings import Settings
 
 if TYPE_CHECKING:
     from threading import Thread
+
+
+GETCOMICS_PAGE_LOAD_TIMEOUT = 30.0
+GETCOMICS_MIRROR_RESOLUTION_TIMEOUT = 45.0
 
 
 # =====================
@@ -437,7 +441,19 @@ class DownloadHandler(metaclass=Singleton):
             gcp = GetComicsPage(link)
 
             try:
-                await gcp.load_data()
+                LOGGER.debug('Loading GetComics article: %s', link)
+                await wait_for(
+                    gcp.load_data(),
+                    timeout=GETCOMICS_PAGE_LOAD_TIMEOUT
+                )
+
+            except TimeoutError:
+                LOGGER.warning(
+                    'Timed out loading GetComics article after %.0f seconds: '
+                    '%s',
+                    GETCOMICS_PAGE_LOAD_TIMEOUT, link
+                )
+                return [], EnqueuingDownloadFailureReason.WEBPAGE_BROKEN
 
             except EnqueuingDownloadFailure as e:
                 # An unavailable article can be temporary throttling,
@@ -449,9 +465,19 @@ class DownloadHandler(metaclass=Singleton):
                 return [], e.reason
 
             try:
-                downloads = await gcp.create_downloads(
-                    volume_id, issue_id, force_match
+                LOGGER.debug('Resolving download mirrors from: %s', link)
+                downloads = await wait_for(
+                    gcp.create_downloads(volume_id, issue_id, force_match),
+                    timeout=GETCOMICS_MIRROR_RESOLUTION_TIMEOUT
                 )
+
+            except TimeoutError:
+                LOGGER.warning(
+                    'Timed out resolving GetComics mirrors after %.0f '
+                    'seconds: %s',
+                    GETCOMICS_MIRROR_RESOLUTION_TIMEOUT, link
+                )
+                return [], EnqueuingDownloadFailureReason.NO_WORKING_LINKS
 
             except EnqueuingDownloadFailure as e:
                 # Individual mirrors confirmed as broken are blocklisted while

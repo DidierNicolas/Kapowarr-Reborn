@@ -33,6 +33,45 @@ class BulkEnqueue(unittest.TestCase):
 
 
 class TemporaryArticleFailure(unittest.IsolatedAsyncioTestCase):
+    async def test_article_timeout_returns_retryable_failure(self):
+        class Page:
+            def __init__(self, link):
+                self.link = link
+
+            async def load_data(self):
+                await asyncio.sleep(1)
+
+        class Handler:
+            queue = []
+
+            def link_in_queue(self, link):
+                return False
+
+            def _DownloadHandler__determine_link_type(self, link):
+                return 'gc'
+
+        with (
+            patch('backend.features.download_queue.GetComicsPage', Page),
+            patch(
+                'backend.features.download_queue.'
+                'GETCOMICS_PAGE_LOAD_TIMEOUT',
+                0.001
+            )
+        ):
+            result, reason = await DownloadHandler.add(
+                Handler(),
+                'https://getcomics.org/example/',
+                1,
+                None,
+                False
+            )
+
+        self.assertEqual(result, [])
+        self.assertEqual(
+            reason,
+            EnqueuingDownloadFailureReason.WEBPAGE_BROKEN
+        )
+
     async def test_unavailable_article_is_not_blocklisted(self):
         class Page:
             def __init__(self, link):
