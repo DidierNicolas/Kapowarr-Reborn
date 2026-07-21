@@ -76,6 +76,51 @@ class TemporaryArticleFailure(unittest.IsolatedAsyncioTestCase):
         )
         add_to_blocklist.assert_not_called()
 
+    async def test_no_working_mirrors_does_not_blocklist_article(self):
+        class Page:
+            title = 'Example #1'
+
+            def __init__(self, link):
+                self.link = link
+
+            async def load_data(self):
+                return None
+
+            async def create_downloads(self, *args):
+                raise EnqueuingDownloadFailure(
+                    EnqueuingDownloadFailureReason.NO_WORKING_LINKS
+                )
+
+        class Handler:
+            queue = []
+
+            def link_in_queue(self, link):
+                return False
+
+            def _DownloadHandler__determine_link_type(self, link):
+                return 'gc'
+
+        with (
+            patch('backend.features.download_queue.GetComicsPage', Page),
+            patch(
+                'backend.features.download_queue.add_to_blocklist'
+            ) as add_to_blocklist
+        ):
+            result, reason = await DownloadHandler.add(
+                Handler(),
+                'https://getcomics.org/example/',
+                1,
+                None,
+                False
+            )
+
+        self.assertEqual(result, [])
+        self.assertEqual(
+            reason,
+            EnqueuingDownloadFailureReason.NO_WORKING_LINKS
+        )
+        add_to_blocklist.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

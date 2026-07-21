@@ -454,18 +454,11 @@ class DownloadHandler(metaclass=Singleton):
                 )
 
             except EnqueuingDownloadFailure as e:
-                if e.reason == EnqueuingDownloadFailureReason.NO_WORKING_LINKS:
-                    add_to_blocklist(
-                        web_link=link,
-                        web_title=gcp.title,
-                        web_sub_title=None,
-                        download_link=None,
-                        source=None,
-                        volume_id=volume_id,
-                        issue_id=issue_id,
-                        reason=BlocklistReason.NO_WORKING_LINKS
-                    )
-
+                # Individual mirrors confirmed as broken are blocklisted while
+                # testing the page. Do not block the whole article when none
+                # work: authentication, throttling, CAPTCHA, and provider
+                # outages are temporary and another search must be able to
+                # retry the article later.
                 LOGGER.warning(
                     f'Unable to extract download links from source; fail_reason="{e.reason.value}"'
                 )

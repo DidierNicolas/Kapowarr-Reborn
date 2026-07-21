@@ -47,6 +47,7 @@ file_extension_regex = compile(r'(?<=\.|\/)[\w\d]{2,4}(?=$|;|\s|\")', IGNORECASE
 file_name_regex = compile(r'filename(?:=\"|\*=UTF-8\'\')(.*?)\.[a-z]{2,4}\"?$', IGNORECASE)
 extract_mediafire_regex = compile(r'window.location.href\s?=\s?\'https://download\d+\.mediafire.com/.*?(?=\')', IGNORECASE)
 DOWNLOAD_CHUNK_SIZE = 262144 # 256KB chunks for responsive queue progress
+DOWNLOAD_VALIDATION_TIMEOUT = 10
 MEDIAFIRE_FOLDER_LINK = "https://www.mediafire.com/api/1.5/file/zip.php"
 WETRANSFER_API_LINK = "https://wetransfer.com/api/v4/transfers/{transfer_id}/download"
 # autopep8: on
@@ -204,7 +205,9 @@ class BaseDirectDownload(Download):
         # link is broken).
         try:
             self._pure_link = self._convert_to_pure_link()
-            with self._fetch_pure_link() as response:
+            with self._fetch_pure_link(
+                timeout=DOWNLOAD_VALIDATION_TIMEOUT
+            ) as response:
                 response.raise_for_status()
                 self._ssn.close()
 
@@ -249,12 +252,21 @@ class BaseDirectDownload(Download):
     def _convert_to_pure_link(self) -> str:
         return self.download_link
 
-    def _fetch_pure_link(self, start_byte: Union[int, None] = None) -> Response:
+    def _fetch_pure_link(
+        self,
+        start_byte: Union[int, None] = None,
+        timeout: Union[int, None] = None
+    ) -> Response:
         headers = {}
         if start_byte is not None and self._supports_range_header:
             headers["Range"] = f"bytes={start_byte}-"
 
-        return self._ssn.get(self.pure_link, headers=headers, stream=True)
+        return self._ssn.get(
+            self.pure_link,
+            headers=headers,
+            stream=True,
+            timeout=timeout or Constants.REQUEST_TIMEOUT
+        )
 
     def _extract_default_filename_body(
         self,
@@ -478,7 +490,11 @@ class MediaFireFolderDownload(BaseDirectDownload):
     def _convert_to_pure_link(self) -> str:
         return self.download_link.split("/folder/")[1].split("/")[0]
 
-    def _fetch_pure_link(self, start_byte: Union[int, None] = None) -> Response:
+    def _fetch_pure_link(
+        self,
+        start_byte: Union[int, None] = None,
+        timeout: Union[int, None] = None
+    ) -> Response:
         headers = {}
         if start_byte is not None and self._supports_range_header:
             headers["Range"] = f"bytes={start_byte}-"
@@ -492,7 +508,8 @@ class MediaFireFolderDownload(BaseDirectDownload):
                 "response_format": (None, "json")
             },
             headers=headers,
-            stream=True
+            stream=True,
+            timeout=timeout or Constants.REQUEST_TIMEOUT
         )
 
 
@@ -600,7 +617,11 @@ class PixelDrainDownload(BaseDirectDownload):
         download_id = self.download_link.rstrip("/").split("/")[-1]
         return Constants.PIXELDRAIN_API_URL + '/file/' + download_id
 
-    def _fetch_pure_link(self, start_byte: Union[int, None] = None) -> Response:
+    def _fetch_pure_link(
+        self,
+        start_byte: Union[int, None] = None,
+        timeout: Union[int, None] = None
+    ) -> Response:
         if self._first_fetch:
             cred = Credentials()
             for pd_cred in cred.get_from_source(CredentialSource.PIXELDRAIN):
@@ -631,7 +652,8 @@ class PixelDrainDownload(BaseDirectDownload):
         return self._ssn.get(
             self.pure_link,
             headers=headers,
-            stream=True
+            stream=True,
+            timeout=timeout or Constants.REQUEST_TIMEOUT
         )
 
 

@@ -136,11 +136,16 @@ def _rank_search_result(
 
 
 class SearchGetComics(SearchSource):
+    max_pages = 10
+
     async def search(self, session: AsyncSession) -> List[SearchResultData]:
-        return await search_getcomics(session, self.query)
+        return await search_getcomics(session, self.query, self.max_pages)
 
 
-async def search_multiple_queries(*queries: str) -> List[SearchResultData]:
+async def search_multiple_queries(
+    *queries: str,
+    max_pages: int = 10
+) -> List[SearchResultData]:
     """Do a manual search for multiple queries asynchronously.
 
     Returns:
@@ -148,15 +153,20 @@ async def search_multiple_queries(*queries: str) -> List[SearchResultData]:
         duplicates removed.
     """
     async with AsyncSession() as session:
-        searches = (
-            Source(query).search(session)
+        sources = (
+            Source(query)
             for Source in get_subclasses(SearchSource)
             for query in queries
         )
+        sources = tuple(sources)
+        for source in sources:
+            if isinstance(source, SearchGetComics):
+                source.max_pages = max_pages
+
         # Query variants target the same provider. Sending all variants at once
         # causes HTTP 429 responses, especially while Search All recursively
         # checks missing issues.
-        responses = [await search for search in searches]
+        responses = [await source.search(session) for source in sources]
 
     search_results: List[SearchResultData] = []
     processed_links = set()
@@ -173,7 +183,8 @@ async def search_multiple_queries(*queries: str) -> List[SearchResultData]:
 
 def manual_search(
     volume_id: int,
-    issue_id: Union[int, None] = None
+    issue_id: Union[int, None] = None,
+    automatic: bool = False
 ) -> List[MatchedSearchResultData]:
     """Do a manual search for a volume or issue.
 
@@ -182,6 +193,9 @@ def manual_search(
         issue_id (Union[int, None], optional): The id of the issue to search for,
         in the case that you want to search for an issue instead of a volume.
             Defaults to None.
+        automatic (bool, optional): Use a focused, shallow provider query. This
+        avoids doing the complete manual-search workload for every missing
+        issue during Search All.
 
     Returns:
         List[MatchedSearchResultData]: List with search results.
@@ -205,7 +219,8 @@ def manual_search(
         calculated_issue_number = issue_data.calculated_issue_number
 
     LOGGER.info(
-        'Starting manual search: %s (%d) %s',
+        'Starting %s search: %s (%d) %s',
+        'automatic' if automatic else 'manual',
         volume_data.title, volume_data.year,
         f'#{issue_number}' if issue_number else ''
     )
@@ -226,6 +241,20 @@ def manual_search(
         else:
             formats = QUERY_FORMATS["Issue"]
 
+        if automatic:
+            if issue_number is not None:
+                # The title and issue number are the most reliable focused
+                # query. Matching still validates series, year and issue.
+                formats = ("{title} #{issue_number}",)
+                max_pages = 1
+            else:
+                # Seed a volume search from a small number of pages; missing
+                # issues are subsequently checked with the focused query.
+                formats = ("{title} ({year})",)
+                max_pages = 3
+        else:
+            max_pages = 10
+
         if volume_data.year is None:
             formats = tuple(
                 f.replace('({year})', '').strip()
@@ -234,12 +263,12 @@ def manual_search(
 
         search_title = normalise_query_string(title).replace(':', '')
         search_results = run(search_multiple_queries(*(
-            format.format(
+            query_format.format(
                 title=search_title, volume_number=volume_data.volume_number,
                 year=volume_data.year, issue_number=issue_number
             )
-            for format in formats
-        )))
+            for query_format in formats
+        ), max_pages=max_pages))
         if not search_results:
             continue
 
@@ -321,7 +350,7 @@ def auto_search(
 
     search_results = [
         r
-        for r in manual_search(volume_id, issue_id)
+        for r in manual_search(volume_id, issue_id, automatic=True)
         if r['match']
     ]
 

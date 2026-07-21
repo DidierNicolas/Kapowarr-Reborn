@@ -9,6 +9,7 @@ from backend.base.definitions import GCDownloadSource
 from backend.implementations.getcomics import (
     _fetch_search_page,
     __extract_button_links as extract_button_links,
+    search_getcomics,
 )
 
 
@@ -28,6 +29,11 @@ class ExtractGetComicsLinks(unittest.TestCase):
                 <div class="aio-pulse">
                     <a href="https://getcomics.org/dls/direct-link">
                         DOWNLOAD NOW
+                    </a>
+                </div>
+                <div class="aio-pulse">
+                    <a href="https://getcomics.org/dls/pixeldrain-link">
+                        PIXELDRAIN
                     </a>
                 </div>
                 <div class="aio-pulse">
@@ -126,6 +132,49 @@ class GetComicsSearchRateLimit(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(first, '')
         self.assertEqual(second, '')
+        self.assertEqual(session.calls, 1)
+
+    async def test_page_limit_prevents_deep_automatic_pagination(self):
+        class Response:
+            status = 200
+            headers = {}
+            ok = True
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def text(self):
+                return (
+                    '<a class="page-numbers">1</a>'
+                    '<a class="page-numbers">2</a>'
+                    '<a class="page-numbers">10</a>'
+                )
+
+        class Session:
+            calls = 0
+
+            def get(self, url, params=None):
+                self.calls += 1
+                return Response()
+
+        session = Session()
+        with (
+            patch(
+                'backend.implementations.getcomics.'
+                '_next_getcomics_search_request',
+                0.0
+            ),
+            patch(
+                'backend.implementations.getcomics.'
+                '_getcomics_search_cooldown_until',
+                0.0
+            )
+        ):
+            await search_getcomics(session, 'X-Men #10', max_pages=1)
+
         self.assertEqual(session.calls, 1)
 
 

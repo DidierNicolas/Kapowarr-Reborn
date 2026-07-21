@@ -4,7 +4,7 @@
 Getting downloads from a GC page
 """
 
-from asyncio import gather, sleep
+from asyncio import gather, sleep, wait_for
 from functools import reduce
 from hashlib import sha1
 from re import IGNORECASE, compile
@@ -60,6 +60,7 @@ GETCOMICS_BUTTON_CLASSES = (
 
 GETCOMICS_SEARCH_REQUEST_INTERVAL = 1.0
 GETCOMICS_RATE_LIMIT_COOLDOWN = 60.0
+GETCOMICS_LINK_VALIDATION_TIMEOUT = 10.0
 _next_getcomics_search_request = 0.0
 _getcomics_search_cooldown_until = 0.0
 
@@ -327,7 +328,9 @@ def __extract_button_links(
                         download_groups.append(result)
                         first_find = False
 
-                    result['links'].setdefault(match, []).append(href)
+                    links = result['links'].setdefault(match, [])
+                    if href not in links:
+                        links.append(href)
 
     return download_groups
 
@@ -393,7 +396,9 @@ def __extract_list_links(
                     download_groups.append(result)
                     first_find = False
 
-                result['links'].setdefault(match, []).append(href)
+                links = result['links'].setdefault(match, [])
+                if href not in links:
+                    links.append(href)
 
     return download_groups
 
@@ -575,12 +580,29 @@ async def __purify_link(
         # Direct magnet link
         return link, TorrentDownload
 
-    async with AsyncSession() as session:
-        r = await session.get(link)
-    if not r.ok:
-        raise LinkBroken(link)
-    url = str(r.real_url)
-    content_type = r.headers.getone("Content-Type", "")
+    try:
+        async with AsyncSession() as session:
+            r = await wait_for(
+                session.get(link),
+                timeout=GETCOMICS_LINK_VALIDATION_TIMEOUT
+            )
+            if not r.ok:
+                raise LinkBroken(link)
+            url = str(r.real_url)
+            content_type = r.headers.getone("Content-Type", "")
+            torrent_content = (
+                await r.read()
+                if (
+                    source == GCDownloadSource.GETCOMICS_TORRENT
+                    and content_type == "application/x-bittorrent"
+                )
+                else None
+            )
+            r.release()
+
+    except TimeoutError as exc:
+        LOGGER.warning('Timed out validating download mirror: %s', link)
+        raise ClientError from exc
 
     if source == GCDownloadSource.MEGA:
         if "#F!" in url or "/folder/" in url:
@@ -622,7 +644,7 @@ async def __purify_link(
         and content_type == "application/x-bittorrent"
     ):
         # Link is to torrent file
-        hash = sha1(bencode(get_torrent_info(await r.read()))).hexdigest()
+        hash = sha1(bencode(get_torrent_info(torrent_content or b''))).hexdigest()
         return (
             "magnet:?xt=urn:btih:" + hash + "&tr=udp://tracker.cyberia.is:6969/announce&tr=udp://tracker.port443.xyz:6969/announce&tr=http://tracker3.itzmx.com:6961/announce&tr=udp://tracker.moeking.me:6969/announce&tr=http://vps02.net.orel.ru:80/announce&tr=http://tracker.openzim.org:80/announce&tr=udp://tracker.skynetcloud.tk:6969/announce&tr=https://1.tracker.eu.org:443/announce&tr=https://3.tracker.eu.org:443/announce&tr=http://re-tracker.uz:80/announce&tr=https://tracker.parrotsec.org:443/announce&tr=udp://explodie.org:6969/announce&tr=udp://tracker.filemail.com:6969/announce&tr=udp://tracker.nyaa.uk:6969/announce&tr=udp://retracker.netbynet.ru:2710/announce&tr=http://tracker.gbitt.info:80/announce&tr=http://tracker2.dler.org:80/announce",
             TorrentDownload
@@ -802,13 +824,15 @@ async def _test_paths(
 # region Searching
 async def search_getcomics(
     session: AsyncSession,
-    query: str
+    query: str,
+    max_pages: int = 10
 ) -> List[SearchResultData]:
     """Give the search results from GC for the query.
 
     Args:
         session (AsyncSession): The session to make the requests with.
         query (str): The query to use.
+        max_pages (int, optional): Maximum number of result pages to fetch.
 
     Returns:
         List[SearchResultData]: The search results.
@@ -825,7 +849,7 @@ async def search_getcomics(
     first_soup = BeautifulSoup(first_page, "html.parser")
     max_page = min(
         _get_max_page(first_soup),
-        10
+        max_pages
     )
 
     # Fetch pages sequentially. Concurrent pagination is treated as abusive by

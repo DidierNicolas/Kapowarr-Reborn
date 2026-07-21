@@ -101,11 +101,16 @@ def blocklist_contains(link: str) -> Union[int, None]:
         SELECT id
         FROM blocklist
         WHERE download_link = :link
-            OR (web_link = :link AND download_link IS NULL)
+            OR (
+                web_link = :link
+                AND download_link IS NULL
+                AND reason = :added_by_user
+            )
         LIMIT 1;
         """,
         {
-            "link": link
+            "link": link,
+            "added_by_user": BlocklistReasonID.ADDED_BY_USER.value
         }
     ).exists()
     return result
