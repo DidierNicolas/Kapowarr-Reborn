@@ -4,10 +4,11 @@
 Getting downloads from a GC page
 """
 
-from asyncio import gather
+from asyncio import gather, sleep
 from functools import reduce
 from hashlib import sha1
 from re import IGNORECASE, compile
+from time import monotonic
 from typing import Callable, List, Tuple, Type, Union
 
 from aiohttp import ClientError
@@ -56,6 +57,65 @@ GETCOMICS_BUTTON_CLASSES = (
     'aio-pulse'
 )
 """Known GetComics download-button wrapper classes."""
+
+GETCOMICS_SEARCH_REQUEST_INTERVAL = 1.0
+GETCOMICS_RATE_LIMIT_COOLDOWN = 60.0
+_next_getcomics_search_request = 0.0
+_getcomics_search_cooldown_until = 0.0
+
+
+async def _fetch_search_page(
+    session: AsyncSession,
+    url: str,
+    query: str
+) -> str:
+    """Fetch one paced GetComics search page.
+
+    A 429 response activates a shared cooldown. Search All creates a new event
+    loop for every volume/issue, so keeping this state at module level prevents
+    those later searches from immediately hammering the provider again.
+    """
+    global _next_getcomics_search_request
+    global _getcomics_search_cooldown_until
+
+    now = monotonic()
+    if now < _getcomics_search_cooldown_until:
+        return ''
+
+    if now < _next_getcomics_search_request:
+        await sleep(_next_getcomics_search_request - now)
+
+    try:
+        async with session.get(url, params={"s": query}) as response:
+            _next_getcomics_search_request = (
+                monotonic() + GETCOMICS_SEARCH_REQUEST_INTERVAL
+            )
+
+            if response.status == 429:
+                retry_after = response.headers.get('Retry-After', '')
+                try:
+                    cooldown = max(
+                        float(retry_after),
+                        GETCOMICS_RATE_LIMIT_COOLDOWN
+                    )
+                except ValueError:
+                    cooldown = GETCOMICS_RATE_LIMIT_COOLDOWN
+
+                _getcomics_search_cooldown_until = monotonic() + cooldown
+                LOGGER.warning(
+                    'GetComics search rate limit reached; pausing searches '
+                    'for %.0f seconds',
+                    cooldown
+                )
+                return ''
+
+            if not response.ok:
+                return ''
+
+            return await response.text()
+
+    except ClientError:
+        return ''
 
 
 # region Scraping
@@ -754,10 +814,10 @@ async def search_getcomics(
         List[SearchResultData]: The search results.
     """
     # Fetch first page and determine max pages
-    first_page = await session.get_text(
+    first_page = await _fetch_search_page(
+        session,
         Constants.GC_SITE_URL,
-        params={"s": query},
-        quiet_fail=True
+        query
     )
     if not first_page:
         return []
@@ -768,25 +828,18 @@ async def search_getcomics(
         10
     )
 
-    # Fetch pages beyond first concurrently
-    other_tasks = [
-        session.get_text(
+    # Fetch pages sequentially. Concurrent pagination is treated as abusive by
+    # GetComics and commonly results in HTTP 429 during Search All.
+    other_htmls = []
+    for page in range(2, max_page + 1):
+        html = await _fetch_search_page(
+            session,
             f"{Constants.GC_SITE_URL}/page/{page}",
-            params={"s": query},
-            quiet_fail=True
+            query
         )
-        for page in range(2, max_page + 1)
-    ]
-
-    if Settings().sv.flaresolverr_base_url:
-        # FlareSolverr available, run at full speed
-        other_htmls = await gather(*other_tasks)
-    else:
-        # FlareSolverr not available, run at sequencial speed
-        other_htmls = [
-            await task
-            for task in other_tasks
-        ]
+        if not html:
+            break
+        other_htmls.append(html)
 
     other_soups = [
         BeautifulSoup(html, "html.parser")

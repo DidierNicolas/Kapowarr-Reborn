@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 
 from backend.base.definitions import GCDownloadSource
 from backend.implementations.getcomics import (
+    _fetch_search_page,
     __extract_button_links as extract_button_links,
 )
 
@@ -80,6 +81,52 @@ class ExtractGetComicsLinks(unittest.TestCase):
             groups[0]['links'][GCDownloadSource.GETCOMICS],
             ['https://getcomics.org/dls/direct-link']
         )
+
+
+class GetComicsSearchRateLimit(unittest.IsolatedAsyncioTestCase):
+    async def test_429_starts_cooldown_for_following_searches(self):
+        class Response:
+            status = 429
+            headers = {}
+            ok = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+        class Session:
+            calls = 0
+
+            def get(self, url, params=None):
+                self.calls += 1
+                return Response()
+
+        session = Session()
+        with (
+            patch(
+                'backend.implementations.getcomics.'
+                '_next_getcomics_search_request',
+                0.0
+            ),
+            patch(
+                'backend.implementations.getcomics.'
+                '_getcomics_search_cooldown_until',
+                0.0
+            ),
+            patch(
+                'backend.implementations.getcomics.'
+                'GETCOMICS_RATE_LIMIT_COOLDOWN',
+                60.0
+            )
+        ):
+            first = await _fetch_search_page(session, 'https://example', 'x')
+            second = await _fetch_search_page(session, 'https://example', 'y')
+
+        self.assertEqual(first, '')
+        self.assertEqual(second, '')
+        self.assertEqual(session.calls, 1)
 
 
 if __name__ == '__main__':

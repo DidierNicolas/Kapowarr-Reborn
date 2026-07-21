@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from asyncio import gather, run
+from asyncio import run
 from typing import Dict, List, Tuple, Union
 
 from backend.base.definitions import (QUERY_FORMATS, MatchedSearchResultData,
@@ -148,12 +148,15 @@ async def search_multiple_queries(*queries: str) -> List[SearchResultData]:
         duplicates removed.
     """
     async with AsyncSession() as session:
-        searches = [
+        searches = (
             Source(query).search(session)
             for Source in get_subclasses(SearchSource)
             for query in queries
-        ]
-        responses = await gather(*searches)
+        )
+        # Query variants target the same provider. Sending all variants at once
+        # causes HTTP 429 responses, especially while Search All recursively
+        # checks missing issues.
+        responses = [await search for search in searches]
 
     search_results: List[SearchResultData] = []
     processed_links = set()
