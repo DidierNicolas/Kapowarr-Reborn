@@ -22,18 +22,38 @@ from backend.internals.db import get_db
 from backend.internals.settings import Settings
 
 WP_POSTS_URL = "https://getcomics.org/wp-json/wp/v2/posts"
-METADATA_VERSION = 12
+METADATA_VERSION = 14
 MAX_RELEASE_DISTANCE_DAYS = 7
 MAX_VOLUME_CANDIDATES = 25
 issue_suffix_regex = compile(r"\s+#(?:\d+(?:\.\w+)?|[A-Za-z]+).*?$", IGNORECASE)
 year_suffix_regex = compile(r"\s*\(\d{4}\)\s*$")
 issue_number_regex = compile(r"\s+#([^\s:]+)", IGNORECASE)
 series_year_regex = compile(r"\((\d{4})\)")
+crossover_regex = compile(r"\bvs\.?\b", IGNORECASE)
+amazing_spiderman_regex = compile(
+    r"\b(?:the\s+)?amazing\s+(?=spider[\s-]*man\b)",
+    IGNORECASE
+)
 
 
 def _metron_enabled() -> bool:
     settings = Settings().sv
     return bool(settings.metron_username and settings.metron_password)
+
+
+def _weekly_title_alias(title: str) -> str:
+    """Return a conservative canonical alias for crossover solicit titles."""
+    if not crossover_regex.search(title):
+        return title
+    return amazing_spiderman_regex.sub('', title).strip()
+
+
+def _weekly_title_matches(left: str, right: str) -> bool:
+    """Match weekly crossover titles without changing library-wide rules."""
+    return match_title(
+        _weekly_title_alias(left),
+        _weekly_title_alias(right)
+    )
 
 
 def _cover_from_post(post: dict) -> str:
@@ -139,7 +159,9 @@ def _public_volume(volume: dict) -> dict:
 def _rank_volume_matches(comic: dict, matches: List[dict]) -> List[dict]:
     """Put exact and recent editions first before limiting validation work."""
     def rank(match: dict):
-        exact_penalty = int(not match_title(comic["query"], match["title"]))
+        exact_penalty = int(not _weekly_title_matches(
+            comic["query"], match["title"]
+        ))
         year_penalty = -(match["year"] or 0)
         publisher_penalty = int(
             (match["publisher"] or "").casefold() not in ("marvel", "dc comics")
@@ -152,7 +174,7 @@ def _rank_volume_matches(comic: dict, matches: List[dict]) -> List[dict]:
 def _candidate_matches(comic: dict) -> List[dict]:
     """Return exact series-title matches for release-date validation."""
     return [match for match in comic["matches"]
-            if match_title(comic["query"], match["title"])]
+            if _weekly_title_matches(comic["query"], match["title"])]
 
 
 def _select_match(
@@ -188,6 +210,7 @@ def _select_match(
     selected = dict(selected)
     selected["issue_comicvine_id"] = issue["comicvine_id"]
     selected["store_date"] = issue["date"]
+    selected["issue_cover_link"] = issue.get("cover_link")
     return selected
 
 
@@ -214,11 +237,13 @@ def _add_issue_validation(
         match["issue_store_date"] = None
         match["release_distance_days"] = None
         match["issue_comicvine_id"] = None
+        match["issue_cover_link"] = None
         if dated:
             distance, issue = min(dated, key=lambda entry: entry[0])
             match["issue_store_date"] = issue["date"]
             match["release_distance_days"] = distance
             match["issue_comicvine_id"] = issue["comicvine_id"]
+            match["issue_cover_link"] = issue.get("cover_link")
 
 
 def refresh_weekly_releases(
@@ -260,7 +285,12 @@ def refresh_weekly_releases(
             "Matching weekly comic %d/%d: %s",
             index, len(result["comics"]), comic["query"]
         )
-        matches = run(comicvine.search_volumes(comic["query"]))
+        # Solicit titles sometimes include branding absent from ComicVine's
+        # canonical volume name, e.g. "Punisher vs. The Amazing Spider-Man"
+        # versus "Punisher vs. Spider-Man". Search the conservative alias.
+        matches = run(comicvine.search_volumes(
+            _weekly_title_alias(comic["query"])
+        ))
         public_matches = [_public_volume(match) for match in matches]
         comic["matches"] = _rank_volume_matches(comic, public_matches)
 
@@ -286,7 +316,10 @@ def refresh_weekly_releases(
             comic, issues_by_volume, pack_day
         )
         if comic["selected_match"]:
-            comic["cover"] = comic["selected_match"]["cover_link"]
+            comic["cover"] = (
+                comic["selected_match"].get("issue_cover_link")
+                or comic["selected_match"]["cover_link"]
+            )
 
     unmatched = [comic for comic in result["comics"]
                  if comic["selected_match"] is None]
@@ -321,7 +354,9 @@ def refresh_weekly_releases(
                 )
             })
             comic["selected_match"] = selected
-            comic["cover"] = selected["cover_link"]
+            comic["cover"] = (
+                selected.get("issue_cover_link") or selected["cover_link"]
+            )
             if not any(match["comicvine_id"] == selected["comicvine_id"]
                        for match in comic["matches"]):
                 comic["matches"].insert(0, selected)
@@ -364,7 +399,9 @@ def set_weekly_release_match(comic_url: str, comicvine_id: int) -> dict:
     if selected is None:
         raise ValueError("ComicVine candidate was not found")
     comic["selected_match"] = selected
-    comic["cover"] = selected["cover_link"]
+    comic["cover"] = (
+        selected.get("issue_cover_link") or selected["cover_link"]
+    )
     cursor.execute(
         "UPDATE weekly_releases SET data = ? WHERE id = 1;",
         (dumps(result, separators=(",", ":")),)

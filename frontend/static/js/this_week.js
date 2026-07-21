@@ -225,6 +225,34 @@ function downloadWeeklyIssue(event, comic, apiKey) {
 	});
 }
 
+function weeklyPublisher(comic) {
+	const publisher = comic.selected_match?.publisher?.trim();
+	if (!publisher) return 'Other / Unknown';
+	const normalized = publisher.toLowerCase();
+	if (normalized === 'marvel' || normalized === 'marvel comics') return 'Marvel Comics';
+	if (normalized === 'dc' || normalized === 'dc comics') return 'DC Comics';
+	if (normalized === 'image' || normalized === 'image comics') return 'Image Comics';
+	return publisher;
+}
+
+function publisherOrder(name) {
+	const featured = ['Marvel Comics', 'DC Comics', 'Image Comics'];
+	const index = featured.indexOf(name);
+	if (index !== -1) return [0, index, name];
+	if (name === 'Other / Unknown') return [2, 0, name];
+	return [1, 0, name.toLowerCase()];
+}
+
+function comparePublishers(left, right) {
+	const leftOrder = publisherOrder(left);
+	const rightOrder = publisherOrder(right);
+	for (let index = 0; index < leftOrder.length; index++) {
+		if (leftOrder[index] < rightOrder[index]) return -1;
+		if (leftOrder[index] > rightOrder[index]) return 1;
+	}
+	return 0;
+}
+
 usingApiKey().then(apiKey => {
 	activeApiKey = apiKey;
 	loadRootFolders(apiKey);
@@ -232,7 +260,37 @@ usingApiKey().then(apiKey => {
 		WeekEls.title.innerText = json.result.title;
 		WeekEls.source.href = json.result.source_url;
 		WeekEls.grid.innerHTML = '';
+		const publisherGroups = new Map();
 		json.result.comics.forEach(comic => {
+			const publisher = weeklyPublisher(comic);
+			if (!publisherGroups.has(publisher)) publisherGroups.set(publisher, []);
+			publisherGroups.get(publisher).push(comic);
+		});
+		[...publisherGroups.keys()].sort(comparePublishers).forEach(publisher => {
+			const comics = publisherGroups.get(publisher);
+			comics.sort((left, right) =>
+				(left.query || left.title).localeCompare(
+					right.query || right.title,
+					undefined,
+					{ sensitivity: 'base', numeric: true }
+				) || String(left.issue_number || '').localeCompare(
+					String(right.issue_number || ''),
+					undefined,
+					{ sensitivity: 'base', numeric: true }
+				)
+			);
+			const section = document.createElement('section');
+			section.className = 'week-publisher-section';
+			const heading = document.createElement('div');
+			heading.className = 'week-publisher-heading';
+			const name = document.createElement('h2');
+			name.innerText = publisher;
+			const count = document.createElement('span');
+			count.innerText = `${comics.length} release${comics.length === 1 ? '' : 's'}`;
+			heading.append(name, count);
+			const publisherGrid = document.createElement('div');
+			publisherGrid.className = 'week-publisher-grid';
+			comics.forEach(comic => {
 			comic.pack_date = json.result.pack_date;
 			const button = document.createElement('article');
 			button.className = 'week-card';
@@ -289,7 +347,10 @@ usingApiKey().then(apiKey => {
 					openComic(comic, apiKey);
 				}
 			};
-			WeekEls.grid.appendChild(button);
+			publisherGrid.appendChild(button);
+			});
+			section.append(heading, publisherGrid);
+			WeekEls.grid.appendChild(section);
 		});
 		WeekEls.loading.classList.add('hidden');
 		WeekEls.grid.classList.remove('hidden');

@@ -192,6 +192,7 @@ class Metron:
                 "calculated_issue_number": calculated or 0.0,
                 "title": None,
                 "date": issue.get("store_date") or issue.get("cover_date"),
-                "description": ""
+                "description": "",
+                "cover_link": None
             })
         return result

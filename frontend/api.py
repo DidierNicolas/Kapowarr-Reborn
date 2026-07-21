@@ -5,7 +5,7 @@ from datetime import datetime
 from io import BytesIO
 from typing import Any, Dict, List, Tuple, Type, Union
 
-from flask import Blueprint, request, send_file
+from flask import Blueprint, Response, request, send_file
 
 from backend.base.custom_exceptions import (InvalidKeyValue,
                                             KeyNotFound, TaskNotFound)
@@ -32,6 +32,8 @@ from backend.implementations.blocklist import (add_to_blocklist,
                                                delete_blocklist_entry,
                                                get_blocklist,
                                                get_blocklist_entry)
+from backend.implementations.calendar_feed import (build_icalendar,
+                                                   get_calendar_entries)
 from backend.implementations.comicvine import ComicVine
 from backend.implementations.conversion import preview_mass_convert
 from backend.implementations.converters import ConvertersManager
@@ -865,63 +867,26 @@ def api_calendar():
     else:
         end = start.replace(month=start.month + 1)
 
-    issues = get_db().execute(
-        """
-        SELECT
-            issues.id,
-            issues.volume_id,
-            issues.issue_number,
-            issues.title,
-            issues.date,
-            issues.monitored,
-            volumes.title AS volume_title,
-            EXISTS(
-                SELECT 1
-                FROM issues_files
-                WHERE issues_files.issue_id = issues.id
-            ) AS downloaded
-        FROM issues
-        INNER JOIN volumes ON volumes.id = issues.volume_id
-        WHERE issues.date >= ? AND issues.date < ?
-        ORDER BY issues.date, volumes.title, issues.calculated_issue_number;
-        """,
-        (start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
-    ).fetchalldict()
+    return return_api(get_calendar_entries(start, end))
 
-    upcoming = get_db().execute(
-        """
-        SELECT
-            NULL AS id,
-            upcoming_releases.volume_id,
-            upcoming_releases.issue_number,
-            NULL AS title,
-            upcoming_releases.release_date AS date,
-            volumes.monitored,
-            volumes.title AS volume_title,
-            0 AS downloaded,
-            upcoming_releases.source,
-            upcoming_releases.source_url,
-            1 AS tentative
-        FROM upcoming_releases
-        INNER JOIN volumes ON volumes.id = upcoming_releases.volume_id
-        WHERE upcoming_releases.release_date >= ?
-          AND upcoming_releases.release_date < ?
-          AND NOT EXISTS (
-              SELECT 1 FROM issues
-              WHERE issues.volume_id = upcoming_releases.volume_id
-                AND issues.issue_number = upcoming_releases.issue_number
-          )
-        ORDER BY upcoming_releases.release_date, volumes.title;
-        """,
-        (start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
-    ).fetchalldict()
 
-    issues.extend(upcoming)
-    issues.sort(key=lambda issue: (
-        issue['date'], issue['volume_title'], issue['issue_number']
-    ))
-
-    return return_api(issues)
+@api.route('/calendar.ics', methods=['GET'])
+@error_handler
+@auth
+def api_calendar_ical():
+    """Return the complete release calendar as an iCalendar subscription."""
+    base_url = request.url_root.rstrip('/')
+    if base_url.endswith('/api'):
+        base_url = base_url[:-4]
+    content = build_icalendar(get_calendar_entries(), base_url)
+    return Response(
+        content,
+        mimetype='text/calendar',
+        headers={
+            'Content-Disposition': 'inline; filename="kapowarr-calendar.ics"',
+            'Cache-Control': 'private, max-age=300'
+        }
+    ), 200
 
 
 @api.route('/weekly-releases', methods=['GET', 'PUT'])

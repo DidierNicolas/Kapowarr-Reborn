@@ -7,7 +7,8 @@ const CalendarEls = {
 	dialog: document.querySelector('#calendar-day-dialog'),
 	dayTitle: document.querySelector('#calendar-day-title'),
 	dayIssues: document.querySelector('#calendar-day-issues'),
-	dayClose: document.querySelector('#calendar-day-close')
+	dayClose: document.querySelector('#calendar-day-close'),
+	icalFeed: document.querySelector('#ical-feed')
 };
 
 let displayedMonth = new Date();
@@ -129,6 +130,16 @@ usingApiKey().then(apiKey => {
 		const now = new Date();
 		displayedMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 		loadCalendar(apiKey);
+	};
+	CalendarEls.icalFeed.onclick = async () => {
+		const feedUrl = `${window.location.origin}${url_base}/api/calendar.ics?api_key=${encodeURIComponent(apiKey)}`;
+		try {
+			await navigator.clipboard.writeText(feedUrl);
+			CalendarEls.icalFeed.innerText = 'iCal Feed Copied';
+			setTimeout(() => CalendarEls.icalFeed.innerText = 'Copy iCal Feed', 1800);
+		} catch (error) {
+			window.prompt('Copy this iCalendar subscription URL:', feedUrl);
+		}
 	};
 });
 

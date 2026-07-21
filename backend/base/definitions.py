@@ -619,6 +619,7 @@ class IssueMetadata(TypedDict):
     title: Union[str, None]
     date: Union[str, None]
     description: str
+    cover_link: Union[str, None]
 
 
 class VolumeMetadata(TypedDict):

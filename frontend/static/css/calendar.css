@@ -18,6 +18,10 @@ main > .calendar-toolbar {
 	text-align: center;
 }
 
+#ical-feed {
+	justify-self: end;
+}
+
 .calendar-navigation {
 	display: flex;
 	align-items: center;
@@ -231,7 +235,7 @@ main > .calendar-grid {
 	main > .calendar-toolbar { grid-template-columns: 1fr; gap: .5rem; padding-block: .75rem; }
 	.calendar-toolbar h1 { grid-row: 1; }
 	.calendar-navigation { justify-content: center; }
-	.calendar-toolbar > div:last-child { display: none; }
+	#ical-feed { justify-self: center; }
 	.calendar-grid { grid-template-columns: repeat(7, minmax(7rem, 1fr)); }
 	main > .calendar-legend { grid-template-columns: repeat(2, max-content); }
 }

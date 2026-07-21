@@ -156,6 +156,7 @@ class ComicVine:
         'id',
         'issue_number',
         'name',
+        'image',
         'cover_date',
         'store_date',
         'description',
@@ -344,6 +345,9 @@ class ComicVine:
             'description': _clean_description(
                 issue_data['description'],
                 short=True
+            ),
+            'cover_link': (
+                (issue_data.get('image') or {}).get('small_url')
             )
         }
 
